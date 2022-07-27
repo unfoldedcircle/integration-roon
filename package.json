@@ -1,7 +1,6 @@
 {
 	"name": "uc-integration-api",
 	"version": "0.0.1",
-	"type": "commonjs",
 	"description": "NodeJS wrapper for the Unfolded Circle Integration API",
 	"main": "driver.js",
 	"scripts": {
@@ -10,10 +9,11 @@
 	"author": "Unfolded Circle",
 	"license": "ISC",
 	"dependencies": {
-		"ws": "^8.8.1",
 		"node-roon-api": "github:roonlabs/node-roon-api",
+		"node-roon-api-image": "github:roonlabs/node-roon-api-image",
 		"node-roon-api-status": "github:roonlabs/node-roon-api-status",
 		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport",
-		"node-roon-api-image": "github:roonlabs/node-roon-api-image"
+		"uc-integration-api": "file:../integration-node-library/uc-integration-api-0.0.1.tgz",
+		"ws": "^8.8.1"
 	}
 }

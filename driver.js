@@ -1,8 +1,10 @@
 "use strict";
 
 // get the UC module
-const uc = require("./lib/uc.js");
+const uc = require("uc-integration-api");
 const fs = require("fs");
+
+uc.init("driver.json");
 
 // handle commands coming from the core
 uc.events.on(
@@ -269,7 +271,6 @@ const RoonApi = require("node-roon-api");
 const RoonApiStatus = require("node-roon-api-status");
 const RoonApiTransport = require("node-roon-api-transport");
 const RoonApiImage = require("node-roon-api-image");
-const { availableEntities } = require("./lib/uc.js");
 
 let RoonCore = null;
 let RoonTransport = null;
