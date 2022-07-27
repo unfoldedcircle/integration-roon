@@ -1,0 +1,19 @@
+{
+	"id": "uc_node_roon_driver",
+	"version": "0.0.1",
+	"min_core_api": "0.0.9",
+	"name": { "en": "Roon Integration" },
+	"icon": "/assets/icon.png",
+	"description": {
+		"en": "Control Roon with Remote Two."
+	},
+	"driver_url": "ws://localhost:8095",
+	"port": "8095",
+	"developer": {
+		"name": "Unfolded Circle",
+		"email": "support@unfoldedcircle.com",
+		"url": "https://www.unfoldedcircle.com/support"
+	},
+	"home_page": "https://www.unfoldedcircle.com",
+	"release_date": "2022-07-24"
+}
