@@ -9,9 +9,9 @@ uc.init("driver.json");
 // handle commands coming from the core
 uc.events.on(
 	uc.eventTypes.entity_command,
-	async (entity_id, entity_type, cmd_id, params) => {
+	async (id, entity_id, entity_type, cmd_id, params) => {
 		console.log(
-			`ENTITY COMMAND: ${entity_id} ${entity_type} ${cmd_id} ${JSON.stringify(
+			`ENTITY COMMAND: ${id} ${entity_id} ${entity_type} ${cmd_id} ${JSON.stringify(
 				params
 			)}`
 		);
@@ -24,25 +24,36 @@ uc.events.on(
 					entity.attributes.state ==
 					uc.Entities.MediaPlayer.states.playing
 				) {
-					RoonTransport.control(entity_id, "pause");
+					RoonTransport.control(entity_id, "pause", (error) => {
+						uc.acknowledgeCommand(id, !error);
+					});
 				} else {
-					RoonTransport.control(entity_id, "play");
+					RoonTransport.control(entity_id, "play", (error) => {
+						uc.acknowledgeCommand(id, !error);
+					});
 				}
 				break;
 
 			case uc.Entities.MediaPlayer.commands.next:
-				RoonTransport.control(entity_id, "next");
+				RoonTransport.control(entity_id, "next", (error) => {
+					uc.acknowledgeCommand(id, !error);
+				});
 				break;
 
 			case uc.Entities.MediaPlayer.commands.previous:
-				RoonTransport.control(entity_id, "previous");
+				RoonTransport.control(entity_id, "previous", (error) => {
+					uc.acknowledgeCommand(id, !error);
+				});
 				break;
 
 			case uc.Entities.MediaPlayer.commands.volume:
 				RoonTransport.change_volume(
 					RoonZones[entity_id].outputs[0].output_id,
 					"absolute",
-					params.volume
+					params.volume,
+					(error) => {
+						uc.acknowledgeCommand(id, !error);
+					}
 				);
 				break;
 
@@ -50,12 +61,18 @@ uc.events.on(
 				if (entity.attributes.muted) {
 					RoonTransport.mute(
 						RoonZones[entity_id].outputs[0].output_id,
-						"unmute"
+						"unmute",
+						(error) => {
+							uc.acknowledgeCommand(id, !error);
+						}
 					);
 				} else {
 					RoonTransport.mute(
 						RoonZones[entity_id].outputs[0].output_id,
-						"mute"
+						"mute",
+						(error) => {
+							uc.acknowledgeCommand(id, !error);
+						}
 					);
 				}
 				break;
@@ -64,7 +81,10 @@ uc.events.on(
 				RoonTransport.seek(
 					entity_id,
 					"absolute",
-					params.media_position
+					params.media_position,
+					(error) => {
+						uc.acknowledgeCommand(id, !error);
+					}
 				);
 				break;
 		}
@@ -97,7 +117,9 @@ uc.events.on(uc.eventTypes.connect, async () => {
 						outputs: zone.outputs,
 					};
 
-					const res = await availableEntities.contains(zone.zone_id);
+					const res = await uc.availableEntities.contains(
+						zone.zone_id
+					);
 					if (!res) {
 						let state;
 						switch (zone.state) {
@@ -223,7 +245,7 @@ uc.events.on(uc.eventTypes.connect, async () => {
 
 						response[
 							uc.Entities.MediaPlayer.attributes.media_image_url
-						] = `http://localhost:9300/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`;
+						] = `http://${RoonCore.registration.extension_host}:${RoonCore.registration.http_port}/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`;
 
 						// convert json
 						let keys = [];
@@ -304,16 +326,6 @@ const roon = new RoonApi({
 });
 
 const svc_status = new RoonApiStatus(roon);
-
-async function getRoonImage(imageKey) {
-	RoonCore.services.RoonApiImage.get_image(
-		imageKey,
-		{ scale: "fit", width: 480, height: 480, format: "image/png" },
-		(cb, contentType, data) => {
-			fs.writeFile("image.png", data);
-		}
-	);
-}
 
 roon.init_services({
 	required_services: [RoonApiTransport, RoonApiImage],
