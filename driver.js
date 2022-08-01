@@ -6,7 +6,27 @@ const fs = require("fs");
 
 uc.init("driver.json");
 
-// handle commands coming from the core
+uc.events.on(uc.eventTypes.subscribe_entities, async (entities) => {
+	entities.forEach(async (entity) => {
+		// update config with list of entities to add listeners to
+		config.configured_entities[entity] =
+			uc.availableEntities.getEntity(entity);
+	});
+
+	//save config
+	saveConfig();
+});
+
+uc.events.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
+	entities.forEach(async (entity) => {
+		// update config with list of entities to add listeners to
+		delete config.configured_entities[entity];
+	});
+
+	//save config
+	saveConfig();
+});
+
 uc.events.on(
 	uc.eventTypes.entity_command,
 	async (id, entity_id, entity_type, cmd_id, params) => {
@@ -16,7 +36,7 @@ uc.events.on(
 			)}`
 		);
 
-		const entity = await uc.configuredEntities.getEntity(entity_id);
+		const entity = uc.configuredEntities.getEntity(entity_id);
 
 		switch (cmd_id) {
 			case uc.Entities.MediaPlayer.commands.play_pause:
@@ -24,25 +44,25 @@ uc.events.on(
 					entity.attributes.state ==
 					uc.Entities.MediaPlayer.states.playing
 				) {
-					RoonTransport.control(entity_id, "pause", (error) => {
-						uc.acknowledgeCommand(id, !error);
+					RoonTransport.control(entity_id, "pause", async (error) => {
+						await uc.acknowledgeCommand(id, !error);
 					});
 				} else {
-					RoonTransport.control(entity_id, "play", (error) => {
-						uc.acknowledgeCommand(id, !error);
+					RoonTransport.control(entity_id, "play", async (error) => {
+						await uc.acknowledgeCommand(id, !error);
 					});
 				}
 				break;
 
 			case uc.Entities.MediaPlayer.commands.next:
-				RoonTransport.control(entity_id, "next", (error) => {
-					uc.acknowledgeCommand(id, !error);
+				RoonTransport.control(entity_id, "next", async (error) => {
+					await uc.acknowledgeCommand(id, !error);
 				});
 				break;
 
 			case uc.Entities.MediaPlayer.commands.previous:
-				RoonTransport.control(entity_id, "previous", (error) => {
-					uc.acknowledgeCommand(id, !error);
+				RoonTransport.control(entity_id, "previous", async (error) => {
+					await uc.acknowledgeCommand(id, !error);
 				});
 				break;
 
@@ -51,8 +71,8 @@ uc.events.on(
 					RoonZones[entity_id].outputs[0].output_id,
 					"absolute",
 					params.volume,
-					(error) => {
-						uc.acknowledgeCommand(id, !error);
+					async (error) => {
+						await uc.acknowledgeCommand(id, !error);
 					}
 				);
 				break;
@@ -62,16 +82,16 @@ uc.events.on(
 					RoonTransport.mute(
 						RoonZones[entity_id].outputs[0].output_id,
 						"unmute",
-						(error) => {
-							uc.acknowledgeCommand(id, !error);
+						async (error) => {
+							await uc.acknowledgeCommand(id, !error);
 						}
 					);
 				} else {
 					RoonTransport.mute(
 						RoonZones[entity_id].outputs[0].output_id,
 						"mute",
-						(error) => {
-							uc.acknowledgeCommand(id, !error);
+						async (error) => {
+							await uc.acknowledgeCommand(id, !error);
 						}
 					);
 				}
@@ -82,32 +102,28 @@ uc.events.on(
 					entity_id,
 					"absolute",
 					params.media_position,
-					(error) => {
-						uc.acknowledgeCommand(id, !error);
+					async (error) => {
+						await uc.acknowledgeCommand(id, !error);
 					}
 				);
+				break;
+
+			default:
+				await uc.acknowledgeCommand(id, false);
 				break;
 		}
 	}
 );
 
 uc.events.on(uc.eventTypes.connect, async () => {
-	svc_status.set_status("Connected", false);
+	roonExtentionStatus.set_status("Connected", false);
 
 	// add event listeners to roon
 	if (RoonCore != null) {
 		RoonTransport = RoonCore.services.RoonApiTransport;
 
 		RoonTransport.subscribe_zones(async (cmd, data) => {
-			// console.log(
-			// 	RoonCore.core_id,
-			// 	RoonCore.display_name,
-			// 	RoonCore.display_version,
-			// 	"-",
-			// 	cmd,
-			// 	data
-			// );
-
+			// todo remove this section when subscribe is implemented
 			if (cmd == "Subscribed") {
 				// if we haven't, we add the zone as entity
 				console.log("Subscribed to zones");
@@ -117,11 +133,172 @@ uc.events.on(uc.eventTypes.connect, async () => {
 						outputs: zone.outputs,
 					};
 
-					const res = await uc.availableEntities.contains(
-						zone.zone_id
-					);
-					if (!res) {
+					const entity = uc.availableEntities.getEntity(zone.zone_id);
+					uc.configuredEntities.addEntity(entity);
+
+					config.configured_entities[entity.id] = entity;
+					saveConfig();
+				});
+			}
+			// todo remove until this
+
+			// update entities here
+			if (cmd == "Changed") {
+				if (data.zones_changed) {
+					data.zones_changed.forEach(async (zone) => {
+						console.log(`change: ${zone.zone_id}`);
+						let response = {};
+
+						// state
+						switch (zone.state) {
+							case "playing":
+								response[
+									uc.Entities.MediaPlayer.attributes.state
+								] = uc.Entities.MediaPlayer.states.playing;
+								break;
+
+							case "stopped":
+							case "paused":
+								response[
+									uc.Entities.MediaPlayer.attributes.state
+								] = uc.Entities.MediaPlayer.states.paused;
+								break;
+						}
+
+						// volume
+						response[uc.Entities.MediaPlayer.attributes.volume] =
+							zone.outputs[0].volume.value;
+
+						// muted
+						response[uc.Entities.MediaPlayer.attributes.muted] =
+							zone.outputs[0].volume.is_muted;
+
+						response[
+							uc.Entities.MediaPlayer.attributes.media_title
+						] = zone.now_playing.three_line.line1;
+
+						response[
+							uc.Entities.MediaPlayer.attributes.media_artist
+						] = zone.now_playing.three_line.line2;
+
+						response[
+							uc.Entities.MediaPlayer.attributes.media_album
+						] = zone.now_playing.three_line.line3;
+
+						response[
+							uc.Entities.MediaPlayer.attributes.media_duration
+						] = zone.now_playing.length;
+
+						response[
+							uc.Entities.MediaPlayer.attributes.media_image_url
+						] = `http://${RoonCore.registration.extension_host}:${RoonCore.registration.http_port}/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`;
+
+						// convert json
+						let keys = [];
+						let values = [];
+
+						Object.entries(response).forEach(([key, value]) => {
+							keys.push(key);
+							values.push(value);
+						});
+
+						if (keys.length > 0) {
+							//update entity
+							console.log(`${keys} ${values}`);
+							uc.configuredEntities.updateEntityAttributes(
+								zone.zone_id,
+								keys,
+								values
+							);
+						}
+					});
+				} else if (data.zones_seek_changed) {
+					data.zones_seek_changed.forEach(async (zone) => {
+						uc.configuredEntities.updateEntityAttributes(
+							zone.zone_id,
+							[uc.Entities.MediaPlayer.attributes.media_position],
+							[zone.seek_position]
+						);
+					});
+				}
+			}
+		});
+	}
+
+	uc.setDeviceState(uc.deviceStates.connected);
+});
+
+uc.events.on(uc.eventTypes.disconnect, async () => {
+	// remove event listeners
+	roonExtentionStatus.set_status("Disconnected", false);
+	RoonZones = {};
+	uc.setDeviceState(uc.deviceStates.disconnected);
+});
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+const RoonApi = require("node-roon-api");
+const RoonApiStatus = require("node-roon-api-status");
+const RoonApiTransport = require("node-roon-api-transport");
+const RoonApiImage = require("node-roon-api-image");
+
+let RoonCore = null;
+let RoonTransport = null;
+let RoonZones = {};
+
+let config = {
+	configured_entities: {},
+};
+
+const roon = new RoonApi({
+	extension_id: "com.uc.remote",
+	display_name: "Unfolded Circle Roon Integration",
+	display_version: "0.0.1",
+	publisher: "Unfolded Circle",
+	email: "support@unfoldedcircle.com",
+	website: "https://unfoldedcircle.com",
+
+	core_paired: (core) => {
+		RoonCore = core;
+
+		console.log(
+			`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
+		);
+
+		getRoonZones();
+	},
+
+	core_unpaired: (core) => {
+		RoonCore = null;
+
+		console.log(
+			`Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
+		);
+
+		// remove entities
+	},
+});
+
+const roonExtentionStatus = new RoonApiStatus(roon);
+
+async function getRoonZones() {
+	if (RoonCore != null) {
+		console.log("Getting Roon Zones");
+		RoonTransport = RoonCore.services.RoonApiTransport;
+
+		RoonTransport.subscribe_zones(async (cmd, data) => {
+			if (cmd == "Subscribed") {
+				// if we haven't, we add the zone as entity
+				console.log("Subscribed to zones");
+
+				data.zones.forEach(async (zone) => {
+					RoonZones[zone.zone_id] = {
+						outputs: zone.outputs,
+					};
+
+					const res = uc.availableEntities.contains(zone.zone_id);
+					if (res == false) {
 						let state;
+
 						switch (zone.state) {
 							case "playing":
 								state = uc.Entities.MediaPlayer.states.playing;
@@ -192,146 +369,106 @@ uc.events.on(uc.eventTypes.connect, async () => {
 						);
 
 						uc.availableEntities.addEntity(entity);
-						uc.configuredEntities.addEntity(entity);
 					}
 				});
 			}
-			// update entities here
-			else if (cmd == "Changed") {
-				if (data.zones_changed) {
-					data.zones_changed.forEach(async (zone) => {
-						console.log(`change: ${zone.zone_id}`);
-						let response = {};
-
-						// state
-						switch (zone.state) {
-							case "playing":
-								response[
-									uc.Entities.MediaPlayer.attributes.state
-								] = uc.Entities.MediaPlayer.states.playing;
-								break;
-
-							case "stopped":
-							case "paused":
-								response[
-									uc.Entities.MediaPlayer.attributes.state
-								] = uc.Entities.MediaPlayer.states.paused;
-								break;
-						}
-
-						// volume
-						response[uc.Entities.MediaPlayer.attributes.volume] =
-							zone.outputs[0].volume.value;
-
-						// muted
-						response[uc.Entities.MediaPlayer.attributes.muted] =
-							zone.outputs[0].volume.is_muted;
-
-						response[
-							uc.Entities.MediaPlayer.attributes.media_title
-						] = zone.now_playing.three_line.line1;
-
-						response[
-							uc.Entities.MediaPlayer.attributes.media_artist
-						] = zone.now_playing.three_line.line2;
-
-						response[
-							uc.Entities.MediaPlayer.attributes.media_album
-						] = zone.now_playing.three_line.line3;
-
-						response[
-							uc.Entities.MediaPlayer.attributes.media_duration
-						] = zone.now_playing.length;
-
-						response[
-							uc.Entities.MediaPlayer.attributes.media_image_url
-						] = `http://${RoonCore.registration.extension_host}:${RoonCore.registration.http_port}/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`;
-
-						// convert json
-						let keys = [];
-						let values = [];
-
-						Object.entries(response).forEach(([key, value]) => {
-							keys.push(key);
-							values.push(value);
-						});
-
-						if (keys.length > 0) {
-							//update entity
-							console.log(`${keys} ${values}`);
-
-							await uc.configuredEntities.updateEntityAttributes(
-								zone.zone_id,
-								keys,
-								values
-							);
-						}
-					});
-				} else if (data.zones_seek_changed) {
-					data.zones_seek_changed.forEach(async (zone) => {
-						await uc.configuredEntities.updateEntityAttributes(
-							zone.zone_id,
-							[uc.Entities.MediaPlayer.attributes.media_position],
-							[zone.seek_position]
-						);
-					});
-				}
-			}
 		});
 	}
-});
-
-uc.events.on(uc.eventTypes.disconnect, async () => {
-	// remove event listeners
-	svc_status.set_status("Disconnected", false);
-	RoonZones = {};
-});
+}
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+function loadConfig() {
+	try {
+		const raw = fs.readFileSync("driver_config.json");
 
-const RoonApi = require("node-roon-api");
-const RoonApiStatus = require("node-roon-api-status");
-const RoonApiTransport = require("node-roon-api-transport");
-const RoonApiImage = require("node-roon-api-image");
+		try {
+			const json = JSON.parse(raw);
+			config = json;
 
-let RoonCore = null;
-let RoonTransport = null;
-let RoonZones = {};
+			Object.entries(config.configured_entities).forEach(
+				([key, value]) => {
+					const entity = new uc.Entities.MediaPlayer(
+						key,
+						value.name,
+						uc.getDriverVersion().id,
+						[
+							uc.Entities.MediaPlayer.features.on_off,
+							uc.Entities.MediaPlayer.features.volume,
+							uc.Entities.MediaPlayer.features.mute_toggle,
+							uc.Entities.MediaPlayer.features.play_pause,
+							uc.Entities.MediaPlayer.features.next,
+							uc.Entities.MediaPlayer.features.previous,
+							uc.Entities.MediaPlayer.features.repeat,
+							uc.Entities.MediaPlayer.features.shuffle,
+							uc.Entities.MediaPlayer.features.seek,
+							uc.Entities.MediaPlayer.features.media_duration,
+							uc.Entities.MediaPlayer.features.media_position,
+							uc.Entities.MediaPlayer.features.media_title,
+							uc.Entities.MediaPlayer.features.media_artist,
+							uc.Entities.MediaPlayer.features.media_album,
+							uc.Entities.MediaPlayer.features.media_image_url,
+						],
+						{
+							[uc.Entities.MediaPlayer.attributes.state]:
+								uc.Entities.MediaPlayer.states.paused,
+							[uc.Entities.MediaPlayer.attributes.volume]: 0,
+							[uc.Entities.MediaPlayer.attributes.muted]: false,
+							[uc.Entities.MediaPlayer.attributes
+								.media_duration]: 0,
+							[uc.Entities.MediaPlayer.attributes
+								.media_position]: 0,
+							[uc.Entities.MediaPlayer.attributes
+								.media_image_url]: "",
+							[uc.Entities.MediaPlayer.attributes.media_title]:
+								"",
+							[uc.Entities.MediaPlayer.attributes.media_artist]:
+								"",
+							[uc.Entities.MediaPlayer.attributes.media_album]:
+								"",
+							[uc.Entities.MediaPlayer.attributes.repeat]: false,
+							[uc.Entities.MediaPlayer.attributes.shuffle]: false,
+						}
+					);
 
-const roon = new RoonApi({
-	extension_id: "com.uc.remote",
-	display_name: "Unfolded Circle Roon Integration",
-	display_version: "0.0.1",
-	publisher: "Unfolded Circle",
-	email: "support@unfoldedcircle.com",
-	website: "https://unfoldedcircle.com",
+					uc.configuredEntities.addEntity(entity);
+				}
+			);
 
-	core_paired: (core) => {
-		RoonCore = core;
+			console.log("Config loaded");
+		} catch (e) {
+			uc.configuredEntities.clear();
+			console.log(
+				"Error parsing config info. Starting with empty config"
+			);
+		}
+	} catch (e) {
+		console.log("No config file found. Starting with empty config");
+		uc.configuredEntities.clear();
+	}
+}
 
-		console.log(
-			`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
-		);
-	},
+function saveConfig() {
+	try {
+		fs.writeFileSync("driver_config.json", JSON.stringify(config));
+		console.log("Config saved to file.");
+	} catch (e) {
+		console.log("Error writing config.");
+	}
+}
 
-	core_unpaired: (core) => {
-		RoonCore = null;
+async function init() {
+	// load config file
+	loadConfig();
 
-		console.log(
-			`Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
-		);
+	// setup roon things
+	roon.init_services({
+		required_services: [RoonApiTransport, RoonApiImage],
+		provided_services: [roonExtentionStatus],
+	});
 
-		// remove entities
-	},
-});
+	roonExtentionStatus.set_status("Disconnected", false);
 
-const svc_status = new RoonApiStatus(roon);
+	roon.start_discovery();
+}
 
-roon.init_services({
-	required_services: [RoonApiTransport, RoonApiImage],
-	provided_services: [svc_status],
-});
-
-svc_status.set_status("Disconnected", false);
-
-roon.start_discovery();
+init();
