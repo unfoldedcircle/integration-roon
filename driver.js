@@ -6,7 +6,7 @@ const fs = require("fs");
 
 uc.init("driver.json");
 
-uc.events.on(uc.eventTypes.subscribe_entities, async (entities) => {
+uc.on(uc.eventTypes.subscribe_entities, async (entities) => {
 	entities.forEach(async (entity) => {
 		// update config with list of entities to add listeners to
 		config.configured_entities[entity] =
@@ -17,7 +17,7 @@ uc.events.on(uc.eventTypes.subscribe_entities, async (entities) => {
 	saveConfig();
 });
 
-uc.events.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
+uc.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
 	entities.forEach(async (entity) => {
 		// update config with list of entities to add listeners to
 		delete config.configured_entities[entity];
@@ -27,7 +27,7 @@ uc.events.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
 	saveConfig();
 });
 
-uc.events.on(
+uc.on(
 	uc.eventTypes.entity_command,
 	async (id, entity_id, entity_type, cmd_id, params) => {
 		console.log(
@@ -115,7 +115,7 @@ uc.events.on(
 	}
 );
 
-uc.events.on(uc.eventTypes.connect, async () => {
+uc.on(uc.eventTypes.connect, async () => {
 	roonExtentionStatus.set_status("Connected", false);
 
 	// add event listeners to roon
@@ -228,7 +228,7 @@ uc.events.on(uc.eventTypes.connect, async () => {
 	uc.setDeviceState(uc.deviceStates.connected);
 });
 
-uc.events.on(uc.eventTypes.disconnect, async () => {
+uc.on(uc.eventTypes.disconnect, async () => {
 	// remove event listeners
 	roonExtentionStatus.set_status("Disconnected", false);
 	RoonZones = {};
