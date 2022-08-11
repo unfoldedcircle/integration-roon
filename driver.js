@@ -6,7 +6,7 @@ const fs = require("fs");
 
 uc.init("driver.json");
 
-uc.on(uc.eventTypes.subscribe_entities, async (entities) => {
+uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entities) => {
 	entities.forEach(async (entity) => {
 		// update config with list of entities to add listeners to
 		config.configured_entities[entity] =
@@ -17,7 +17,7 @@ uc.on(uc.eventTypes.subscribe_entities, async (entities) => {
 	saveConfig();
 });
 
-uc.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
+uc.on(uc.EVENTS.UNSUBSCRIBE_ENTITIES, async (entities) => {
 	entities.forEach(async (entity) => {
 		// update config with list of entities to add listeners to
 		delete config.configured_entities[entity];
@@ -28,7 +28,7 @@ uc.on(uc.eventTypes.unsubscribe_entities, async (entities) => {
 });
 
 uc.on(
-	uc.eventTypes.entity_command,
+	uc.EVENTS.ENTITY_COMMAND,
 	async (id, entity_id, entity_type, cmd_id, params) => {
 		console.log(
 			`ENTITY COMMAND: ${id} ${entity_id} ${entity_type} ${cmd_id} ${JSON.stringify(
@@ -39,10 +39,10 @@ uc.on(
 		const entity = uc.configuredEntities.getEntity(entity_id);
 
 		switch (cmd_id) {
-			case uc.Entities.MediaPlayer.commands.play_pause:
+			case uc.Entities.MediaPlayer.COMMANDS.PLAY_PAUSE:
 				if (
 					entity.attributes.state ==
-					uc.Entities.MediaPlayer.states.playing
+					uc.Entities.MediaPlayer.STATES.PLAYING
 				) {
 					RoonTransport.control(entity_id, "pause", async (error) => {
 						await uc.acknowledgeCommand(id, !error);
@@ -54,19 +54,19 @@ uc.on(
 				}
 				break;
 
-			case uc.Entities.MediaPlayer.commands.next:
+			case uc.Entities.MediaPlayer.COMMANDS.NEXT:
 				RoonTransport.control(entity_id, "next", async (error) => {
 					await uc.acknowledgeCommand(id, !error);
 				});
 				break;
 
-			case uc.Entities.MediaPlayer.commands.previous:
+			case uc.Entities.MediaPlayer.COMMANDS.PREVIOUS:
 				RoonTransport.control(entity_id, "previous", async (error) => {
 					await uc.acknowledgeCommand(id, !error);
 				});
 				break;
 
-			case uc.Entities.MediaPlayer.commands.volume:
+			case uc.Entities.MediaPlayer.COMMANDS.VOLUME:
 				RoonTransport.change_volume(
 					RoonZones[entity_id].outputs[0].output_id,
 					"absolute",
@@ -77,7 +77,7 @@ uc.on(
 				);
 				break;
 
-			case uc.Entities.MediaPlayer.commands.mute_toggle:
+			case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
 				if (entity.attributes.muted) {
 					RoonTransport.mute(
 						RoonZones[entity_id].outputs[0].output_id,
@@ -97,7 +97,7 @@ uc.on(
 				}
 				break;
 
-			case uc.Entities.MediaPlayer.commands.seek:
+			case uc.Entities.MediaPlayer.COMMANDS.SEEK:
 				RoonTransport.seek(
 					entity_id,
 					"absolute",
@@ -115,7 +115,7 @@ uc.on(
 	}
 );
 
-uc.on(uc.eventTypes.connect, async () => {
+uc.on(uc.EVENTS.CONNECT, async () => {
 	roonExtentionStatus.set_status("Connected", false);
 
 	// add event listeners to roon
@@ -153,44 +153,44 @@ uc.on(uc.eventTypes.connect, async () => {
 						switch (zone.state) {
 							case "playing":
 								response[
-									uc.Entities.MediaPlayer.attributes.state
-								] = uc.Entities.MediaPlayer.states.playing;
+									uc.Entities.MediaPlayer.ATTRIBUTES.STATE
+								] = uc.Entities.MediaPlayer.STATES.PLAYING;
 								break;
 
 							case "stopped":
 							case "paused":
 								response[
-									uc.Entities.MediaPlayer.attributes.state
-								] = uc.Entities.MediaPlayer.states.paused;
+									uc.Entities.MediaPlayer.ATTRIBUTES.STATE
+								] = uc.Entities.MediaPlayer.STATES.PAUSED;
 								break;
 						}
 
 						// volume
-						response[uc.Entities.MediaPlayer.attributes.volume] =
+						response[uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME] =
 							zone.outputs[0].volume.value;
 
 						// muted
-						response[uc.Entities.MediaPlayer.attributes.muted] =
+						response[uc.Entities.MediaPlayer.ATTRIBUTES.MUTED] =
 							zone.outputs[0].volume.is_muted;
 
 						response[
-							uc.Entities.MediaPlayer.attributes.media_title
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
 						] = zone.now_playing.three_line.line1;
 
 						response[
-							uc.Entities.MediaPlayer.attributes.media_artist
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
 						] = zone.now_playing.three_line.line2;
 
 						response[
-							uc.Entities.MediaPlayer.attributes.media_album
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
 						] = zone.now_playing.three_line.line3;
 
 						response[
-							uc.Entities.MediaPlayer.attributes.media_duration
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
 						] = zone.now_playing.length;
 
 						response[
-							uc.Entities.MediaPlayer.attributes.media_image_url
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
 						] = `http://${RoonCore.registration.extension_host}:${RoonCore.registration.http_port}/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`;
 
 						// convert json
@@ -216,7 +216,7 @@ uc.on(uc.eventTypes.connect, async () => {
 					data.zones_seek_changed.forEach(async (zone) => {
 						uc.configuredEntities.updateEntityAttributes(
 							zone.zone_id,
-							[uc.Entities.MediaPlayer.attributes.media_position],
+							[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION],
 							[zone.seek_position]
 						);
 					});
@@ -225,14 +225,14 @@ uc.on(uc.eventTypes.connect, async () => {
 		});
 	}
 
-	uc.setDeviceState(uc.deviceStates.connected);
+	uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
 });
 
-uc.on(uc.eventTypes.disconnect, async () => {
+uc.on(uc.EVENTS.DISCONNECT, async () => {
 	// remove event listeners
 	roonExtentionStatus.set_status("Disconnected", false);
 	RoonZones = {};
-	uc.setDeviceState(uc.deviceStates.disconnected);
+	uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -301,12 +301,12 @@ async function getRoonZones() {
 
 						switch (zone.state) {
 							case "playing":
-								state = uc.Entities.MediaPlayer.states.playing;
+								state = uc.Entities.MediaPlayer.STATES.PLAYING;
 								break;
 
 							case "stopped":
 							case "paused":
-								state = uc.Entities.MediaPlayer.states.paused;
+								state = uc.Entities.MediaPlayer.STATES.PAUSED;
 								break;
 						}
 
@@ -315,56 +315,56 @@ async function getRoonZones() {
 							zone.display_name,
 							uc.getDriverVersion().id,
 							[
-								uc.Entities.MediaPlayer.features.on_off,
-								uc.Entities.MediaPlayer.features.volume,
-								uc.Entities.MediaPlayer.features.mute_toggle,
-								uc.Entities.MediaPlayer.features.play_pause,
-								uc.Entities.MediaPlayer.features.next,
-								uc.Entities.MediaPlayer.features.previous,
-								uc.Entities.MediaPlayer.features.repeat,
-								uc.Entities.MediaPlayer.features.shuffle,
-								uc.Entities.MediaPlayer.features.seek,
-								uc.Entities.MediaPlayer.features.media_duration,
-								uc.Entities.MediaPlayer.features.media_position,
-								uc.Entities.MediaPlayer.features.media_title,
-								uc.Entities.MediaPlayer.features.media_artist,
-								uc.Entities.MediaPlayer.features.media_album,
-								uc.Entities.MediaPlayer.features
-									.media_image_url,
+								uc.Entities.MediaPlayer.FEATURES.ON_OFF,
+								uc.Entities.MediaPlayer.FEATURES.VOLUME,
+								uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
+								uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
+								uc.Entities.MediaPlayer.FEATURES.NEXT,
+								uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
+								uc.Entities.MediaPlayer.FEATURES.REPEAT,
+								uc.Entities.MediaPlayer.FEATURES.SHUFFLE,
+								uc.Entities.MediaPlayer.FEATURES.SEEK,
+								uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
+								uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
+								uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
+								uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
+								uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
+								uc.Entities.MediaPlayer.FEATURES
+									.MEDIA_IMAGE_URL,
 							],
 							{
-								[uc.Entities.MediaPlayer.attributes.state]:
+								[uc.Entities.MediaPlayer.ATTRIBUTES.STATE]:
 									state,
-								[uc.Entities.MediaPlayer.attributes.volume]:
+								[uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME]:
 									zone.outputs[0].volume.value,
-								[uc.Entities.MediaPlayer.attributes.muted]:
+								[uc.Entities.MediaPlayer.ATTRIBUTES.MUTED]:
 									zone.outputs[0].volume.is_muted,
-								[uc.Entities.MediaPlayer.attributes
-									.media_duration]: zone.now_playing
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_DURATION]: zone.now_playing
 									? zone.now_playing.length
 										? zone.now_playing.length
 										: 0
 									: 0,
-								[uc.Entities.MediaPlayer.attributes
-									.media_position]: 0,
-								[uc.Entities.MediaPlayer.attributes
-									.media_image_url]: "",
-								[uc.Entities.MediaPlayer.attributes
-									.media_title]: zone.now_playing
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_POSITION]: 0,
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_IMAGE_URL]: "",
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_TITLE]: zone.now_playing
 									? zone.now_playing.three_line.line1
 									: "",
-								[uc.Entities.MediaPlayer.attributes
-									.media_artist]: zone.now_playing
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_ARTIST]: zone.now_playing
 									? zone.now_playing.three_line.line2
 									: "",
-								[uc.Entities.MediaPlayer.attributes
-									.media_album]: zone.now_playing
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.MEDIA_ALBUM]: zone.now_playing
 									? zone.now_playing.three_line.line3
 									: "",
-								[uc.Entities.MediaPlayer.attributes
-									.repeat]: false,
-								[uc.Entities.MediaPlayer.attributes
-									.shuffle]: false,
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.REPEAT]: false,
+								[uc.Entities.MediaPlayer.ATTRIBUTES
+									.SHUFFLE]: false,
 							}
 						);
 
@@ -392,41 +392,41 @@ function loadConfig() {
 						value.name,
 						uc.getDriverVersion().id,
 						[
-							uc.Entities.MediaPlayer.features.on_off,
-							uc.Entities.MediaPlayer.features.volume,
-							uc.Entities.MediaPlayer.features.mute_toggle,
-							uc.Entities.MediaPlayer.features.play_pause,
-							uc.Entities.MediaPlayer.features.next,
-							uc.Entities.MediaPlayer.features.previous,
-							uc.Entities.MediaPlayer.features.repeat,
-							uc.Entities.MediaPlayer.features.shuffle,
-							uc.Entities.MediaPlayer.features.seek,
-							uc.Entities.MediaPlayer.features.media_duration,
-							uc.Entities.MediaPlayer.features.media_position,
-							uc.Entities.MediaPlayer.features.media_title,
-							uc.Entities.MediaPlayer.features.media_artist,
-							uc.Entities.MediaPlayer.features.media_album,
-							uc.Entities.MediaPlayer.features.media_image_url,
+							uc.Entities.MediaPlayer.FEATURES.ON_OFF,
+							uc.Entities.MediaPlayer.FEATURES.VOLUME,
+							uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
+							uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
+							uc.Entities.MediaPlayer.FEATURES.NEXT,
+							uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
+							uc.Entities.MediaPlayer.FEATURES.REPEAT,
+							uc.Entities.MediaPlayer.FEATURES.SHUFFLE,
+							uc.Entities.MediaPlayer.FEATURES.SEEK,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_IMAGE_URL,
 						],
 						{
-							[uc.Entities.MediaPlayer.attributes.state]:
-								uc.Entities.MediaPlayer.states.paused,
-							[uc.Entities.MediaPlayer.attributes.volume]: 0,
-							[uc.Entities.MediaPlayer.attributes.muted]: false,
-							[uc.Entities.MediaPlayer.attributes
-								.media_duration]: 0,
-							[uc.Entities.MediaPlayer.attributes
-								.media_position]: 0,
-							[uc.Entities.MediaPlayer.attributes
-								.media_image_url]: "",
-							[uc.Entities.MediaPlayer.attributes.media_title]:
+							[uc.Entities.MediaPlayer.ATTRIBUTES.STATE]:
+								uc.Entities.MediaPlayer.STATES.PAUSED,
+							[uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME]: 0,
+							[uc.Entities.MediaPlayer.ATTRIBUTES.MUTED]: false,
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_DURATION]: 0,
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_POSITION]: 0,
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_IMAGE_URL]: "",
+							[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE]:
 								"",
-							[uc.Entities.MediaPlayer.attributes.media_artist]:
+							[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST]:
 								"",
-							[uc.Entities.MediaPlayer.attributes.media_album]:
+							[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM]:
 								"",
-							[uc.Entities.MediaPlayer.attributes.repeat]: false,
-							[uc.Entities.MediaPlayer.attributes.shuffle]: false,
+							[uc.Entities.MediaPlayer.ATTRIBUTES.REPEAT]: false,
+							[uc.Entities.MediaPlayer.ATTRIBUTES.SHUFFLE]: false,
 						}
 					);
 
