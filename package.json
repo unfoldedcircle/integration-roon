@@ -1,6 +1,6 @@
 {
 	"name": "uc-integration-roon",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Roon Integration for the Unfolded Circle",
 	"main": "driver.js",
 	"scripts": {
@@ -13,7 +13,7 @@
 		"node-roon-api-image": "github:roonlabs/node-roon-api-image",
 		"node-roon-api-status": "github:roonlabs/node-roon-api-status",
 		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport",
-		"uc-integration-api": "file:../integration-node-library/uc-integration-api-0.0.5.tgz",
+		"uc-integration-api": "file:../uc_integration-node-library/uc-integration-api-0.0.6.tgz",
 		"ws": "^8.8.1"
 	}
 }

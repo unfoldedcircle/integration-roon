@@ -1,19 +1,38 @@
 {
-	"id": "uc_node_roon_driver",
-	"version": "0.0.1",
-	"min_core_api": "0.0.9",
-	"name": { "en": "Roon Integration" },
-	"icon": "/assets/icon.png",
+	"driver_id": "uc_roon_driver",
+	"version": "0.0.3",
+	"min_core_api": "0.0.2",
+	"name": { "en": "Roon" },
+	"icon": "custom:roon.png",
 	"description": {
 		"en": "Control Roon with Remote Two."
 	},
-	"driver_url": "ws://localhost:8095",
-	"port": "8095",
+	"port": "8100",
 	"developer": {
-		"name": "Unfolded Circle",
-		"email": "support@unfoldedcircle.com",
-		"url": "https://www.unfoldedcircle.com/support"
+		"name": "Unfolded Circle ApS",
+		"email": "hello@unfoldedcircle.com",
+		"url": "https://www.unfoldedcircle.com"
 	},
 	"home_page": "https://www.unfoldedcircle.com",
-	"release_date": "2022-07-24"
+	"setup_data_schema": {
+		"title": {
+			"en": "Integration setup"
+		},
+		"settings": [
+			{
+				"id": "info",
+				"label": {
+					"en": "Setup process"
+				},
+				"field": {
+					"label": {
+						"value": {
+							"en": "The integration will enable an extention for Roon on your network."
+						}
+					}
+				}
+			}
+		]
+	},
+	"release_date": "2023-04-23"
 }
