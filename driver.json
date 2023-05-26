@@ -5,7 +5,8 @@
 	"name": { "en": "Roon" },
 	"icon": "custom:roon.png",
 	"description": {
-		"en": "Control Roon with Remote Two."
+		"en": "Control Roon with Remote Two.",
+		"de": "Steuere Roon mit Remote Two"
 	},
 	"port": "8100",
 	"developer": {
@@ -16,18 +17,21 @@
 	"home_page": "https://www.unfoldedcircle.com",
 	"setup_data_schema": {
 		"title": {
-			"en": "Integration setup"
+			"en": "Integration setup",
+			"de": "Integrationssetup"
 		},
 		"settings": [
 			{
 				"id": "info",
 				"label": {
-					"en": "Setup process"
+					"en": "Setup process",
+					"de": "Setup Fortschritt"
 				},
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will enable an extention for Roon on your network."
+							"en": "The integration will enable an extention for Roon on your network.",
+							"de": "Diese Integration ermöglicht die Steuerung von Roon im Netzwerk."
 						}
 					}
 				}
