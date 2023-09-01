@@ -2,8 +2,16 @@
 
 // get the UC module
 const uc = require("uc-integration-api");
-
 uc.init("driver.json");
+
+// set working directory
+const process = require('process')
+try {
+	process.chdir(uc.configDirPath);
+	console.log(`Changed working directory to: ${uc.configDirPath}`);
+} catch (error) {
+	console.error(`Error changing working directory: ${error}`);
+}
 
 uc.on(
 	uc.EVENTS.ENTITY_COMMAND,
@@ -156,7 +164,7 @@ let RoonPaired = false;
 const roon = new RoonApi({
 	extension_id: "com.uc.remote",
 	display_name: "Unfolded Circle Roon Integration",
-	display_version: uc.getDriverVersion().version.driver,
+	display_version: uc.getDriverVersion().version.api,
 	publisher: "Unfolded Circle",
 	email: "support@unfoldedcircle.com",
 	website: "https://unfoldedcircle.com",
