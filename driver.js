@@ -61,6 +61,26 @@ uc.on(
 				);
 				break;
 
+			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
+				RoonTransport.change_volume(
+					RoonZones[entity_id].outputs[0].output_id,
+					"relative_step", 1,
+					async (error) => {
+						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+					}
+				);
+				break;
+			
+			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
+				RoonTransport.change_volume(
+					RoonZones[entity_id].outputs[0].output_id,
+					"relative_step", -1,
+					async (error) => {
+						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+					}
+				);
+				break;
+
 			case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
 				if (entity.attributes.muted) {
 					RoonTransport.mute(
@@ -112,12 +132,12 @@ uc.on(uc.EVENTS.DISCONNECT, async () => {
 });
 
 uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
-	await getRoonZones();
-	await roonConnect();
+	await roonDisconnect();
 });
 
 uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
-	await roonDisconnect();
+	await getRoonZones();
+	await roonConnect();
 });
 
 // DRIVER SETUP
@@ -141,6 +161,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
 
 	if (RoonPaired) {
 		console.log('Driver setup completed!');
+		await getRoonZones();
 		await uc.driverSetupComplete(wsHandle);
 	} else {
 		await uc.driverSetupError(wsHandle, 'Failed to pair with Roon.');
@@ -160,6 +181,7 @@ let RoonCore = null;
 let RoonTransport = null;
 let RoonZones = {};
 let RoonPaired = false;
+let RoonImage = null;
 
 const roon = new RoonApi({
 	extension_id: "com.uc.remote",
@@ -172,6 +194,7 @@ const roon = new RoonApi({
 	core_paired: (core) => {
 		RoonCore = core;
 		RoonPaired = true;
+		RoonImage = new RoonApiImage(core);
 
 		console.log(
 			`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
@@ -181,6 +204,7 @@ const roon = new RoonApi({
 	core_unpaired: (core) => {
 		RoonCore = null;
 		RoonPaired = false;
+		RoonImage = null;
 
 		console.log(
 			`Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
@@ -228,6 +252,7 @@ async function getRoonZones() {
 							[
 								uc.Entities.MediaPlayer.FEATURES.ON_OFF,
 								uc.Entities.MediaPlayer.FEATURES.VOLUME,
+								uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN,
 								uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
 								uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
 								uc.Entities.MediaPlayer.FEATURES.NEXT,
@@ -339,9 +364,17 @@ async function roonConnect() {
 							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
 						], zone.now_playing.length);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-						], `http://${RoonCore.registration.extension_host}:${RoonCore.registration.http_port}/api/image/${zone.now_playing.image_key}?scale=fit&width=480&height=480`);
+						if (zone.now_playing.image_key) {
+							RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
+								if (image) {
+									let imageResponse =  new Map([]);
+									imageResponse.set([
+										uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+									], "data:image/png;base64," + image.toString('base64'));
+									uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+								}
+							});
+						}
 
 						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
 					});
