@@ -1,6 +1,6 @@
 {
 	"driver_id": "uc_roon_driver",
-	"version": "0.1.0",
+	"version": "0.1.3",
 	"min_core_api": "0.0.4",
 	"name": { "en": "Roon" },
 	"icon": "custom:roon.png",
