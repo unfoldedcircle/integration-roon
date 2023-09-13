@@ -121,8 +121,8 @@ uc.on(
 
 uc.on(uc.EVENTS.CONNECT, async () => {
 	// aka get available entities
-	await getRoonZones();
 	await roonConnect();
+	await getRoonZones();
 	uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
 });
 
@@ -136,8 +136,8 @@ uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
 });
 
 uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
-	await getRoonZones();
 	await roonConnect();
+	await getRoonZones();
 });
 
 // DRIVER SETUP
@@ -225,6 +225,7 @@ async function getRoonZones() {
 				console.log("Subscribed to zones");
 
 				data.zones.forEach(async (zone) => {
+					console.log(`Found zone: ${zone.zone_id}`);
 					RoonZones[zone.zone_id] = {
 						outputs: zone.outputs,
 					};
