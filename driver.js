@@ -147,7 +147,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
 	await uc.acknowledgeCommand(wsHandle);
 	console.log('Acknowledged driver setup');
 
-	const img = convertImageToBase64('./assets/setupimg.png');
+	const img = convertImageToBase64(uc.configDirPath + '/assets/setupimg.png');
 	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
 });
 
