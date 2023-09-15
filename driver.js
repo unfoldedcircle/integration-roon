@@ -147,7 +147,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
 	await uc.acknowledgeCommand(wsHandle);
 	console.log('Acknowledged driver setup');
 
-	const img = convertImageToBase64(uc.configDirPath + '/assets/setupimg.png');
+	const img = convertImageToBase64('/opt/uc/integrations/roon/assets/setupimg.png');
 	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
 });
 
@@ -159,8 +159,11 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
 	await uc.driverSetupProgress(wsHandle);
 	console.log('Sending setup progress that we are still busy...');
 
+	await delay(3000);
+
 	if (RoonPaired) {
 		console.log('Driver setup completed!');
+		await roonConnect();
 		await getRoonZones();
 		await uc.driverSetupComplete(wsHandle);
 	} else {
@@ -182,6 +185,8 @@ let RoonTransport = null;
 let RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const roon = new RoonApi({
 	extension_id: "com.uc.remote",
@@ -405,7 +410,7 @@ async function roonDisconnect() {
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 function convertImageToBase64(file) {
-	let data;
+	let data = null;
 
 	try {
 		data = fs.readFileSync(file, 'base64');
