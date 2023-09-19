@@ -70,7 +70,7 @@ uc.on(
 					}
 				);
 				break;
-			
+
 			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
 				RoonTransport.change_volume(
 					RoonZones[entity_id].outputs[0].output_id,
@@ -191,7 +191,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const roon = new RoonApi({
 	extension_id: "com.uc.remote",
 	display_name: "Unfolded Circle Roon Integration",
-	display_version: uc.getDriverVersion().version.api,
+	display_version: uc.getDriverVersion().version.driver,
 	publisher: "Unfolded Circle",
 	email: "support@unfoldedcircle.com",
 	website: "https://unfoldedcircle.com",
@@ -250,58 +250,64 @@ async function getRoonZones() {
 								break;
 						}
 
+						let features = [
+							uc.Entities.MediaPlayer.FEATURES.ON_OFF,
+							uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
+							uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
+							uc.Entities.MediaPlayer.FEATURES.NEXT,
+							uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
+							uc.Entities.MediaPlayer.FEATURES.SEEK,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
+							uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
+							uc.Entities.MediaPlayer.FEATURES
+								.MEDIA_IMAGE_URL,
+						];
+
+						let attributes = new Map([
+							[uc.Entities.MediaPlayer.ATTRIBUTES.STATE,
+								state],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_DURATION, zone.now_playing
+								? zone.now_playing.length
+									? zone.now_playing.length
+									: 0
+								: 0],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_POSITION, 0],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_IMAGE_URL, ""],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_TITLE, zone.now_playing
+								? zone.now_playing.three_line.line1
+								: ""],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_ARTIST, zone.now_playing
+								? zone.now_playing.three_line.line2
+								: ""],
+							[uc.Entities.MediaPlayer.ATTRIBUTES
+								.MEDIA_ALBUM, zone.now_playing
+								? zone.now_playing.three_line.line3
+								: ""]
+						]);
+
+						if (zone.outputs[0].volume) {
+							features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
+							features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
+
+							attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
+							attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
+						}
+
 						const entity = new uc.Entities.MediaPlayer(
 							zone.zone_id,
 							new Map([[
 								'en', zone.display_name
 							]]),
-							[
-								uc.Entities.MediaPlayer.FEATURES.ON_OFF,
-								uc.Entities.MediaPlayer.FEATURES.VOLUME,
-								uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN,
-								uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
-								uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
-								uc.Entities.MediaPlayer.FEATURES.NEXT,
-								uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
-								uc.Entities.MediaPlayer.FEATURES.SEEK,
-								uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
-								uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
-								uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
-								uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
-								uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
-								uc.Entities.MediaPlayer.FEATURES
-									.MEDIA_IMAGE_URL,
-							],
-							new Map([
-								[uc.Entities.MediaPlayer.ATTRIBUTES.STATE,
-									state],
-								[uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME,
-									zone.outputs[0].volume.value],
-								[uc.Entities.MediaPlayer.ATTRIBUTES.MUTED,
-									zone.outputs[0].volume.is_muted],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_DURATION, zone.now_playing
-									? zone.now_playing.length
-										? zone.now_playing.length
-										: 0
-									: 0],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_POSITION, 0],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_IMAGE_URL, ""],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_TITLE, zone.now_playing
-									? zone.now_playing.three_line.line1
-									: ""],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_ARTIST, zone.now_playing
-									? zone.now_playing.three_line.line2
-									: ""],
-								[uc.Entities.MediaPlayer.ATTRIBUTES
-									.MEDIA_ALBUM, zone.now_playing
-									? zone.now_playing.three_line.line3
-									: ""]
-							])
+							features,
+							attributes
 						);
 
 						uc.availableEntities.addEntity(entity);
@@ -325,7 +331,7 @@ async function roonConnect() {
 				if (data.zones_changed) {
 					data.zones_changed.forEach(async (zone) => {
 						console.log(`change: ${zone.zone_id}`);
-						
+
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
 							return;
 						}
@@ -335,19 +341,19 @@ async function roonConnect() {
 						// state
 						switch (zone.state) {
 							case "playing":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], 
+								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
 									uc.Entities.MediaPlayer.STATES.PLAYING);
 								break;
 
 							case "stopped":
 							case "paused":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], 
+								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
 									uc.Entities.MediaPlayer.STATES.PAUSED);
 								break;
 						}
 
 						// volume
-						response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], 
+						response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
 							zone.outputs[0].volume.value);
 
 						// muted
@@ -373,7 +379,7 @@ async function roonConnect() {
 						if (zone.now_playing.image_key) {
 							RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
 								if (image) {
-									let imageResponse =  new Map([]);
+									let imageResponse = new Map([]);
 									imageResponse.set([
 										uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
 									], "data:image/png;base64," + image.toString('base64'));
