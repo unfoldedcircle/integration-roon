@@ -352,13 +352,15 @@ async function roonConnect() {
 								break;
 						}
 
-						// volume
-						response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
-							zone.outputs[0].volume.value);
+						if (zone.outputs[0].volume) {
+							// volume
+							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
+								zone.outputs[0].volume.value);
 
-						// muted
-						response.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
-							zone.outputs[0].volume.is_muted);
+							// muted
+							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
+								zone.outputs[0].volume.is_muted);
+						}
 
 						response.set([
 							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
