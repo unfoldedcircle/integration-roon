@@ -1,9 +1,9 @@
 {
 	"driver_id": "uc_roon_driver",
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"min_core_api": "0.20.0",
 	"name": { "en": "Roon" },
-	"icon": "custom:roon.png",
+	"icon": "uc:integration",
 	"description": {
 		"en": "Control Roon with Remote Two."
 	},
