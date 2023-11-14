@@ -21,11 +21,16 @@ uc.on(
 		);
 
 		const entity = uc.configuredEntities.getEntity(entity_id);
+		if (entity == null) {
+			console.warn(`Entity ${entity_id} is not configured: cannot execute command ${cmd_id}`)
+			await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
+			return
+		}
 
 		switch (cmd_id) {
 			case uc.Entities.MediaPlayer.COMMANDS.PLAY_PAUSE:
 				if (
-					entity.attributes.state ==
+					entity.attributes.state ===
 					uc.Entities.MediaPlayer.STATES.PLAYING
 				) {
 					RoonTransport.control(entity_id, "pause", async (error) => {
@@ -113,7 +118,8 @@ uc.on(
 				break;
 
 			default:
-				await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.NOT_FOUND);
+				console.warn(`Unknown entity command: ${cmd_id}`)
+				await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
 				break;
 		}
 	}
@@ -225,7 +231,7 @@ async function getRoonZones() {
 		RoonTransport = RoonCore.services.RoonApiTransport;
 
 		RoonTransport.subscribe_zones(async (cmd, data) => {
-			if (cmd == "Subscribed") {
+			if (cmd === "Subscribed") {
 				// if we haven't, we add the zone as entity
 				console.log("Subscribed to zones");
 
@@ -327,7 +333,7 @@ async function roonConnect() {
 
 		RoonTransport.subscribe_zones(async (cmd, data) => {
 			// update entities here
-			if (cmd == "Changed") {
+			if (cmd === "Changed") {
 				if (data.zones_changed) {
 					data.zones_changed.forEach(async (zone) => {
 						console.log(`change: ${zone.zone_id}`);
