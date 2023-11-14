@@ -1,14 +1,13 @@
 {
 	"driver_id": "uc_roon_driver",
-	"version": "0.0.3",
-	"min_core_api": "0.0.2",
+	"version": "0.1.8",
+	"min_core_api": "0.20.0",
 	"name": { "en": "Roon" },
-	"icon": "custom:roon.png",
+	"icon": "uc:integration",
 	"description": {
 		"en": "Control Roon with Remote Two.",
 		"de": "Steuere Roon mit Remote Two"
 	},
-	"port": "8100",
 	"developer": {
 		"name": "Unfolded Circle ApS",
 		"email": "hello@unfoldedcircle.com",
@@ -30,7 +29,7 @@
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will enable an extention for Roon on your network.",
+							"en": "The integration will enable an extension for Roon on your network.",
 							"de": "Diese Integration ermöglicht die Steuerung von Roon im Netzwerk."
 						}
 					}
@@ -38,5 +37,5 @@
 			}
 		]
 	},
-	"release_date": "2023-04-23"
+	"release_date": "2023-09-15"
 }
