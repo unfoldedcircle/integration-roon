@@ -18,6 +18,8 @@ let RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
 
+let subscribedEntities = [];
+
 // set working directory
 const process = require('process')
 try {
@@ -155,6 +157,8 @@ uc.on(uc.EVENTS.DISCONNECT, async () => {
 });
 
 uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
+	subscribedEntities = entityIds;
+
 	entityIds.forEach(async (entityId) => {
 		const entity = uc.availableEntities.getEntity(entityId);
 		if (entity == null) {
@@ -242,6 +246,14 @@ let roon = new RoonApi({
 		);
 
 		await getRoonZones(null);
+
+		for (const entityId of subscribedEntities) {
+			const entity = uc.availableEntities.getEntity(entityId);
+			console.debug(`Entity is: ${entity}`);
+			if (entity != null) {
+				uc.configuredEntities.addEntity(entity);
+			}
+		}
 
 		await subscribeRoonZones();
 	},
