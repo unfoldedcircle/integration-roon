@@ -1,6 +1,6 @@
 {
 	"name": "uc-integration-roon",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Roon Integration for the Unfolded Circle",
 	"main": "driver.js",
 	"scripts": {

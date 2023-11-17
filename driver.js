@@ -246,16 +246,6 @@ let roon = new RoonApi({
 		);
 
 		await getRoonZones(null);
-
-		for (const entityId of subscribedEntities) {
-			const entity = uc.availableEntities.getEntity(entityId);
-			console.debug(`Entity is: ${entity}`);
-			if (entity != null) {
-				uc.configuredEntities.addEntity(entity);
-			}
-		}
-
-		await subscribeRoonZones();
 	},
 
 	core_unpaired: (core) => {
@@ -288,7 +278,7 @@ async function getRoonZones(wsHandle) {
 
 		RoonTransport.get_zones(async (error, data) => {
 			if (!error) {
-				data.zones.forEach(async (zone) => {
+				for (const zone of data.zones) {
 					console.log(`[uc_roon] Found zone: ${zone.zone_id}`);
 					RoonZones[zone.zone_id] = {
 						outputs: zone.outputs,
@@ -371,12 +361,22 @@ async function getRoonZones(wsHandle) {
 
 						uc.availableEntities.addEntity(entity);
 					}
-				});
+				};
 
 				if (wsHandle != null) {
 					await uc.sendAvailableEntities(wsHandle);
 				}
 			}
+
+			for (const entityId of subscribedEntities) {
+				const entity = uc.availableEntities.getEntity(entityId);
+				console.debug(`Entity is: ${entity}`);
+				if (entity != null) {
+					uc.configuredEntities.addEntity(entity);
+				}
+			}
+	
+			await subscribeRoonZones();
 		});
 	} else {
 		console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
@@ -468,6 +468,73 @@ async function subscribeRoonZones() {
 							new Map([
 								[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION, zone.seek_position]
 							]));
+					});
+				}
+			} else if (cmd == "Subscribed") {
+				if (data.zones) {
+					data.zones.forEach(async (zone) => {
+						console.log(`[uc_roon] Subscribed: ${zone.zone_id}`);
+
+						if (!uc.configuredEntities.contains(zone.zone_id)) {
+							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
+							return;
+						}
+
+						let response = new Map([]);
+
+						// state
+						switch (zone.state) {
+							case "playing":
+								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
+									uc.Entities.MediaPlayer.STATES.PLAYING);
+								break;
+
+							case "stopped":
+							case "paused":
+								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
+									uc.Entities.MediaPlayer.STATES.PAUSED);
+								break;
+						}
+
+						if (zone.outputs[0].volume) {
+							// volume
+							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
+								zone.outputs[0].volume.value);
+
+							// muted
+							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
+								zone.outputs[0].volume.is_muted);
+						}
+
+						response.set([
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
+						], zone.now_playing.three_line.line1);
+
+						response.set([
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
+						], zone.now_playing.three_line.line2);
+
+						response.set([
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
+						], zone.now_playing.three_line.line3);
+
+						response.set([
+							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
+						], zone.now_playing.length);
+
+						if (zone.now_playing.image_key) {
+							RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
+								if (image) {
+									let imageResponse = new Map([]);
+									imageResponse.set([
+										uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+									], "data:image/png;base64," + image.toString('base64'));
+									uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+								}
+							});
+						}
+
+						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
 					});
 				}
 			}
