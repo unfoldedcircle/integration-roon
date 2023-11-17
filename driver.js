@@ -1,28 +1,42 @@
 "use strict";
 
-// get the UC module
 const uc = require("uc-integration-api");
 uc.init("driver.json");
+
+const RoonApi = require("node-roon-api");
+const RoonApiStatus = require("node-roon-api-status");
+const RoonApiTransport = require("node-roon-api-transport");
+const RoonApiImage = require("node-roon-api-image");
+const fs = require("fs");
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// roon global variables
+let RoonCore = null;
+let RoonTransport = null;
+let RoonZones = {};
+let RoonPaired = false;
+let RoonImage = null;
 
 // set working directory
 const process = require('process')
 try {
 	process.chdir(uc.configDirPath);
-	console.log(`Changed working directory to: ${uc.configDirPath}`);
+	console.log(`[uc_roon] Changed working directory to: ${uc.configDirPath}`);
 } catch (error) {
-	console.error(`Error changing working directory: ${error}`);
+	console.error(`[uc_roon] Error changing working directory: ${error}`);
 }
 
 uc.on(
 	uc.EVENTS.ENTITY_COMMAND,
 	async (wsHandle, entity_id, entity_type, cmd_id, params) => {
 		console.log(
-			`ENTITY COMMAND: ${wsHandle} ${entity_id} ${entity_type} ${cmd_id}`
+			`[uc_roon] ENTITY COMMAND: ${wsHandle} ${entity_id} ${entity_type} ${cmd_id}`
 		);
 
 		const entity = uc.configuredEntities.getEntity(entity_id);
 		if (entity == null) {
-			console.warn(`Entity ${entity_id} is not configured: cannot execute command ${cmd_id}`)
+			console.warn(`[uc_roon] Entity ${entity_id} is not configured: cannot execute command ${cmd_id}`)
 			await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
 			return
 		}
@@ -118,7 +132,7 @@ uc.on(
 				break;
 
 			default:
-				console.warn(`Unknown entity command: ${cmd_id}`)
+				console.warn(`[uc_roon] Unknown entity command: ${cmd_id}`)
 				await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
 				break;
 		}
@@ -126,73 +140,85 @@ uc.on(
 );
 
 uc.on(uc.EVENTS.CONNECT, async () => {
-	// aka get available entities
-	await roonConnect();
-	await getRoonZones();
+	roonExtentionStatus.set_status("Connected", false);
+	await getRoonZones(null);
 	uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
 });
 
 uc.on(uc.EVENTS.DISCONNECT, async () => {
-	await roonDisconnect();
+	roonExtentionStatus.set_status("Disconnected", false);
 	uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
+uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
+	entityIds.forEach(async (entityId) => {
+		const entity = uc.availableEntities.getEntity(entityId);
+		if (entity == null) {
+			console.error(`[uc_roon] Available entity not found: ${entityId}`);
+			await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.NOT_FOUND);
+			return;
+		}
+
+		uc.configuredEntities.addEntity(entity);
+	});
+
+	await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.OK);
+});
+
+uc.on(uc.EVENTS.UNSUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
+	entityIds.forEach(async (entityId) => {
+		console.debug(`[uc_roon] Unsubscribe: ${entityId}`);
+		uc.configuredEntities.removeEntity(entityId);
+	});
+
+	await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.OK);
+});
+
 uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
-	await roonDisconnect();
+	roonExtentionStatus.set_status("Disconnected", false);
 });
 
 uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
-	await roonConnect();
-	await getRoonZones();
+	roonExtentionStatus.set_status("Connected", false);
+});
+
+uc.on(uc.EVENTS.GET_AVAILABLE_ENTITIES, async (wsHandle) => {
+	await getRoonZones(wsHandle);
 });
 
 // DRIVER SETUP
 uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
-	console.log(`Setting up driver. Setup data: ${setupData}`);
+	console.log(`[uc_roon] Setting up driver. Setup data: ${setupData}`);
 
 	await uc.acknowledgeCommand(wsHandle);
-	console.log('Acknowledged driver setup');
+	console.log('[uc_roon] Acknowledged driver setup');
 
 	const img = convertImageToBase64('/opt/uc/integrations/roon/assets/setupimg.png');
 	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
 });
 
 uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
-	console.log('Received user confirmation for driver setup: sending OK');
+	console.log('[uc_roon] Received user confirmation for driver setup: sending OK');
 	await uc.acknowledgeCommand(wsHandle);
 
 	// Update setup progress
 	await uc.driverSetupProgress(wsHandle);
-	console.log('Sending setup progress that we are still busy...');
+	console.log('[uc_roon] Sending setup progress that we are still busy...');
 
 	await delay(3000);
 
 	if (RoonPaired) {
-		console.log('Driver setup completed!');
-		await roonConnect();
-		await getRoonZones();
+		console.log('[uc_roon] Driver setup completed!');
+		await getRoonZones(null);
 		await uc.driverSetupComplete(wsHandle);
 	} else {
 		await uc.driverSetupError(wsHandle, 'Failed to pair with Roon.');
-		console.error("Failed to pair with Roon");
+		console.error("[uc_roon] Failed to pair with Roon");
 	}
 });
 // END DRIVER SETUP
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-const RoonApi = require("node-roon-api");
-const RoonApiStatus = require("node-roon-api-status");
-const RoonApiTransport = require("node-roon-api-transport");
-const RoonApiImage = require("node-roon-api-image");
-const fs = require("fs");
-
-let RoonCore = null;
-let RoonTransport = null;
-let RoonZones = {};
-let RoonPaired = false;
-let RoonImage = null;
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const roon = new RoonApi({
 	extension_id: "com.uc.remote",
@@ -208,35 +234,33 @@ const roon = new RoonApi({
 		RoonImage = new RoonApiImage(core);
 
 		console.log(
-			`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
+			`[uc_roon] Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
 		);
+
+		subscribeRoonZones();
 	},
 
 	core_unpaired: (core) => {
-		RoonCore = null;
 		RoonPaired = false;
-		RoonImage = null;
 
 		console.log(
-			`Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
+			`[uc_roon] Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
 		);
+		// TODO(marton): Do we need to do anything here? It seems like it pairs automatically again after some time.
 	},
 });
 
 const roonExtentionStatus = new RoonApiStatus(roon);
 
-async function getRoonZones() {
+async function getRoonZones(wsHandle) {
 	if (RoonCore != null) {
-		console.log("Getting Roon Zones");
+		console.log("[uc_roon] Getting Roon Zones");
 		RoonTransport = RoonCore.services.RoonApiTransport;
 
-		RoonTransport.subscribe_zones(async (cmd, data) => {
-			if (cmd === "Subscribed") {
-				// if we haven't, we add the zone as entity
-				console.log("Subscribed to zones");
-
+		RoonTransport.get_zones(async (error, data) => {
+			if (!error) {
 				data.zones.forEach(async (zone) => {
-					console.log(`Found zone: ${zone.zone_id}`);
+					console.log(`[uc_roon] Found zone: ${zone.zone_id}`);
 					RoonZones[zone.zone_id] = {
 						outputs: zone.outputs,
 					};
@@ -319,26 +343,30 @@ async function getRoonZones() {
 						uc.availableEntities.addEntity(entity);
 					}
 				});
+
+				if (wsHandle != null) {
+					await uc.sendAvailableEntities(wsHandle);
+				}
 			}
 		});
+	} else {
+		console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
 	}
 }
 
-async function roonConnect() {
-	roonExtentionStatus.set_status("Connected", false);
-
+async function subscribeRoonZones() {
 	// add event listeners to roon
 	if (RoonCore != null) {
 		RoonTransport = RoonCore.services.RoonApiTransport;
 
 		RoonTransport.subscribe_zones(async (cmd, data) => {
-			// update entities here
 			if (cmd === "Changed") {
 				if (data.zones_changed) {
 					data.zones_changed.forEach(async (zone) => {
-						console.log(`change: ${zone.zone_id}`);
+						console.log(`[uc_roon] Change: ${zone.zone_id}`);
 
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
+							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
 							return;
 						}
 
@@ -398,9 +426,11 @@ async function roonConnect() {
 
 						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
 					});
+
 				} else if (data.zones_seek_changed) {
 					data.zones_seek_changed.forEach(async (zone) => {
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
+							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
 							return;
 						}
 
@@ -414,12 +444,6 @@ async function roonConnect() {
 			}
 		});
 	}
-}
-
-async function roonDisconnect() {
-	// remove event listeners
-	roonExtentionStatus.set_status("Disconnected", false);
-	RoonZones = {};
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -436,7 +460,6 @@ function convertImageToBase64(file) {
 }
 
 async function init() {
-	// setup roon things
 	roon.init_services({
 		required_services: [RoonApiTransport, RoonApiImage],
 		provided_services: [roonExtentionStatus],
