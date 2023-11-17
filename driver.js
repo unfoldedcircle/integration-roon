@@ -34,6 +34,10 @@ uc.on(
 			`[uc_roon] ENTITY COMMAND: ${wsHandle} ${entity_id} ${entity_type} ${cmd_id}`
 		);
 
+		if (!RoonPaired) {
+			console.error(`[uc_roon] Roon is not paird. Not executing command ${cmd_id}`);
+		}
+
 		const entity = uc.configuredEntities.getEntity(entity_id);
 		if (entity == null) {
 			console.warn(`[uc_roon] Entity ${entity_id} is not configured: cannot execute command ${cmd_id}`)
@@ -220,7 +224,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-const roon = new RoonApi({
+let roon = new RoonApi({
 	extension_id: "com.uc.remote",
 	display_name: "Unfolded Circle Roon Integration",
 	display_version: uc.getDriverVersion().version.driver,
@@ -228,7 +232,7 @@ const roon = new RoonApi({
 	email: "support@unfoldedcircle.com",
 	website: "https://unfoldedcircle.com",
 
-	core_paired: (core) => {
+	core_paired: async (core) => {
 		RoonCore = core;
 		RoonPaired = true;
 		RoonImage = new RoonApiImage(core);
@@ -237,7 +241,9 @@ const roon = new RoonApi({
 			`[uc_roon] Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
 		);
 
-		subscribeRoonZones();
+		await getRoonZones(null);
+
+		await subscribeRoonZones();
 	},
 
 	core_unpaired: (core) => {
@@ -246,6 +252,17 @@ const roon = new RoonApi({
 		console.log(
 			`[uc_roon] Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
 		);
+
+		const entities = uc.configuredEntities.getEntities();
+
+		for (const entity of entities) {
+			if (entity.entity_id) {
+				let response = new Map([]);
+				response.set([uc.Entities.Light.ATTRIBUTES.STATE], uc.Entities.Light.STATES.UNAVAILABLE);
+				uc.configuredEntities.updateEntityAttributes(entity.entity_id, response);
+			}
+		}
+
 		// TODO(marton): Do we need to do anything here? It seems like it pairs automatically again after some time.
 	},
 });
