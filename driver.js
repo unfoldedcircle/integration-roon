@@ -425,32 +425,34 @@ async function subscribeRoonZones() {
 								zone.outputs[0].volume.is_muted);
 						}
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-						], zone.now_playing.three_line.line1);
+						if (zone.now_playing) {
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
+							], zone.now_playing.three_line.line1);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-						], zone.now_playing.three_line.line2);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
+							], zone.now_playing.three_line.line2);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-						], zone.now_playing.three_line.line3);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
+							], zone.now_playing.three_line.line3);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
-						], zone.now_playing.length);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
+							], zone.now_playing.length);
 
-						if (zone.now_playing.image_key) {
-							RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
-								if (image) {
-									let imageResponse = new Map([]);
-									imageResponse.set([
-										uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-									], "data:image/png;base64," + image.toString('base64'));
-									uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
-								}
-							});
+							if (zone.now_playing.image_key) {
+								RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
+									if (image) {
+										let imageResponse = new Map([]);
+										imageResponse.set([
+											uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+										], "data:image/png;base64," + image.toString('base64'));
+										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+									}
+								});
+							}
 						}
 
 						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
@@ -506,32 +508,39 @@ async function subscribeRoonZones() {
 								zone.outputs[0].volume.is_muted);
 						}
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-						], zone.now_playing.three_line.line1);
+						if (zone.now_playing) {
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
+							], zone.now_playing.three_line.line1);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-						], zone.now_playing.three_line.line2);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
+							], zone.now_playing.three_line.line2);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-						], zone.now_playing.three_line.line3);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
+							], zone.now_playing.three_line.line3);
 
-						response.set([
-							uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
-						], zone.now_playing.length);
+							response.set([
+								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
+							], zone.now_playing.length);
 
-						if (zone.now_playing.image_key) {
-							RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
-								if (image) {
-									let imageResponse = new Map([]);
-									imageResponse.set([
-										uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-									], "data:image/png;base64," + image.toString('base64'));
-									uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
-								}
-							});
+							if (zone.now_playing.image_key) {
+								RoonImage.get_image(zone.now_playing.image_key, {
+									scale: 'fit',
+									width: 480,
+									height: 480,
+									format: 'image/jpeg'
+								}, (error, content_type, image) => {
+									if (image) {
+										let imageResponse = new Map([]);
+										imageResponse.set([
+											uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+										], "data:image/png;base64," + image.toString('base64'));
+										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+									}
+								});
+							}
 						}
 
 						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
