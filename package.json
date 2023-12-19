@@ -13,7 +13,7 @@
 		"node-roon-api-image": "github:roonlabs/node-roon-api-image",
 		"node-roon-api-status": "github:roonlabs/node-roon-api-status",
 		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport",
-		"uc-integration-api": "git+https://github.com/unfoldedcircle/integration-node-library.git#956fb9b816983f4521c7b6b0dea4f7fef37926c1",
-		"ws": "^8.8.1"
+		"uc-integration-api": "git+https://github.com/unfoldedcircle/integration-node-library.git#18e552698c14eca05347f0e666ff11dc56b94e1e",
+		"ws": "^8.15.1"
 	}
 }

@@ -157,6 +157,11 @@ uc.on(uc.EVENTS.DISCONNECT, async () => {
 });
 
 uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
+	if (!entityIds) {
+		subscribedEntities.length = 0;
+		return;
+	}
+
 	subscribedEntities = entityIds;
 
 	entityIds.forEach(async (entityId) => {
@@ -235,6 +240,7 @@ let roon = new RoonApi({
 	publisher: "Unfolded Circle",
 	email: "support@unfoldedcircle.com",
 	website: "https://unfoldedcircle.com",
+	log_level: "none",  // #9 disable excessive msg logging (album art image buffer)
 
 	core_paired: async (core) => {
 		RoonCore = core;
@@ -361,21 +367,23 @@ async function getRoonZones(wsHandle) {
 
 						uc.availableEntities.addEntity(entity);
 					}
-				};
+				}
 
 				if (wsHandle != null) {
 					await uc.sendAvailableEntities(wsHandle);
 				}
 			}
 
-			for (const entityId of subscribedEntities) {
-				const entity = uc.availableEntities.getEntity(entityId);
-				console.debug(`Entity is: ${entity}`);
-				if (entity != null) {
-					uc.configuredEntities.addEntity(entity);
+			if (subscribedEntities) {
+				for (const entityId of subscribedEntities) {
+					const entity = uc.availableEntities.getEntity(entityId);
+					console.debug(`Entity is: ${entity}`);
+					if (entity != null) {
+						uc.configuredEntities.addEntity(entity);
+					}
 				}
 			}
-	
+
 			await subscribeRoonZones();
 		});
 	} else {
@@ -472,7 +480,7 @@ async function subscribeRoonZones() {
 							]));
 					});
 				}
-			} else if (cmd == "Subscribed") {
+			} else if (cmd === "Subscribed") {
 				if (data.zones) {
 					data.zones.forEach(async (zone) => {
 						console.log(`[uc_roon] Subscribed: ${zone.zone_id}`);
