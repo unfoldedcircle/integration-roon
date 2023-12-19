@@ -463,6 +463,10 @@ async function subscribeRoonZones() {
 										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
 									}
 								});
+							} else {
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+								], "");
 							}
 						}
 
@@ -551,6 +555,10 @@ async function subscribeRoonZones() {
 										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
 									}
 								});
+							} else {
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+								], "");
 							}
 						}
 
