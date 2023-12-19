@@ -252,6 +252,7 @@ let roon = new RoonApi({
 		);
 
 		await getRoonZones(null);
+		await subscribeRoonZones();
 	},
 
 	core_unpaired: (core) => {
@@ -283,95 +284,98 @@ async function getRoonZones(wsHandle) {
 		RoonTransport = RoonCore.services.RoonApiTransport;
 
 		RoonTransport.get_zones(async (error, data) => {
-			if (!error) {
-				for (const zone of data.zones) {
-					console.log(`[uc_roon] Found zone: ${zone.zone_id}`);
-					RoonZones[zone.zone_id] = {
-						outputs: zone.outputs,
-					};
+			if (error) {
+				console.log("[uc_roon] Failed to get Roon Zones");
+				return
+			}
 
-					const res = uc.availableEntities.contains(zone.zone_id);
-					if (!res) {
-						let state;
+			for (const zone of data.zones) {
+				console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
+				RoonZones[zone.zone_id] = {
+					outputs: zone.outputs,
+				};
 
-						switch (zone.state) {
-							case "playing":
-								state = uc.Entities.MediaPlayer.STATES.PLAYING;
-								break;
+				const res = uc.availableEntities.contains(zone.zone_id);
+				if (!res) {
+					let state;
 
-							case "stopped":
-							case "paused":
-								state = uc.Entities.MediaPlayer.STATES.PAUSED;
-								break;
-						}
+					switch (zone.state) {
+						case "playing":
+							state = uc.Entities.MediaPlayer.STATES.PLAYING;
+							break;
 
-						let features = [
-							uc.Entities.MediaPlayer.FEATURES.ON_OFF,
-							uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
-							uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
-							uc.Entities.MediaPlayer.FEATURES.NEXT,
-							uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
-							uc.Entities.MediaPlayer.FEATURES.SEEK,
-							uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
-							uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
-							uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
-							uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
-							uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
-							uc.Entities.MediaPlayer.FEATURES
-								.MEDIA_IMAGE_URL,
-						];
-
-						let attributes = new Map([
-							[uc.Entities.MediaPlayer.ATTRIBUTES.STATE,
-								state],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_DURATION, zone.now_playing
-								? zone.now_playing.length
-									? zone.now_playing.length
-									: 0
-								: 0],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_POSITION, 0],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_IMAGE_URL, ""],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_TITLE, zone.now_playing
-								? zone.now_playing.three_line.line1
-								: ""],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_ARTIST, zone.now_playing
-								? zone.now_playing.three_line.line2
-								: ""],
-							[uc.Entities.MediaPlayer.ATTRIBUTES
-								.MEDIA_ALBUM, zone.now_playing
-								? zone.now_playing.three_line.line3
-								: ""]
-						]);
-
-						if (zone.outputs[0].volume) {
-							features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
-							features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
-
-							attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
-							attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
-						}
-
-						const entity = new uc.Entities.MediaPlayer(
-							zone.zone_id,
-							new Map([[
-								'en', zone.display_name
-							]]),
-							features,
-							attributes
-						);
-
-						uc.availableEntities.addEntity(entity);
+						case "stopped":
+						case "paused":
+							state = uc.Entities.MediaPlayer.STATES.PAUSED;
+							break;
 					}
-				}
 
-				if (wsHandle != null) {
-					await uc.sendAvailableEntities(wsHandle);
+					let features = [
+						uc.Entities.MediaPlayer.FEATURES.ON_OFF,
+						uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
+						uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
+						uc.Entities.MediaPlayer.FEATURES.NEXT,
+						uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
+						uc.Entities.MediaPlayer.FEATURES.SEEK,
+						uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
+						uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
+						uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
+						uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
+						uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
+						uc.Entities.MediaPlayer.FEATURES
+							.MEDIA_IMAGE_URL,
+					];
+
+					let attributes = new Map([
+						[uc.Entities.MediaPlayer.ATTRIBUTES.STATE,
+							state],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_DURATION, zone.now_playing
+							? zone.now_playing.length
+								? zone.now_playing.length
+								: 0
+							: 0],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_POSITION, 0],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_IMAGE_URL, ""],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_TITLE, zone.now_playing
+							? zone.now_playing.three_line.line1
+							: ""],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_ARTIST, zone.now_playing
+							? zone.now_playing.three_line.line2
+							: ""],
+						[uc.Entities.MediaPlayer.ATTRIBUTES
+							.MEDIA_ALBUM, zone.now_playing
+							? zone.now_playing.three_line.line3
+							: ""]
+					]);
+
+					if (zone.outputs[0].volume) {
+						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
+						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
+
+						attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
+						attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
+					}
+
+					const entity = new uc.Entities.MediaPlayer(
+						zone.zone_id,
+						new Map([[
+							'en', zone.display_name
+						]]),
+						features,
+						attributes
+					);
+
+					uc.availableEntities.addEntity(entity);
 				}
+			}
+
+			if (wsHandle != null) {
+				await uc.sendAvailableEntities(wsHandle);
 			}
 
 			if (subscribedEntities) {
@@ -384,7 +388,6 @@ async function getRoonZones(wsHandle) {
 				}
 			}
 
-			await subscribeRoonZones();
 		});
 	} else {
 		console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
@@ -400,10 +403,10 @@ async function subscribeRoonZones() {
 			if (cmd === "Changed") {
 				if (data.zones_changed) {
 					data.zones_changed.forEach(async (zone) => {
-						console.log(`[uc_roon] Change: ${zone.zone_id}`);
+						console.log(`[uc_roon] Change: ${zone.display_name} (${zone.zone_id})`);
 
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
+							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
 							return;
 						}
 
@@ -469,7 +472,7 @@ async function subscribeRoonZones() {
 				} else if (data.zones_seek_changed) {
 					data.zones_seek_changed.forEach(async (zone) => {
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
+							console.log(`[uc_roon] Configured entity not found, not updating seek: ${zone.display_name} (${zone.zone_id})`);
 							return;
 						}
 
@@ -483,10 +486,10 @@ async function subscribeRoonZones() {
 			} else if (cmd === "Subscribed") {
 				if (data.zones) {
 					data.zones.forEach(async (zone) => {
-						console.log(`[uc_roon] Subscribed: ${zone.zone_id}`);
+						console.log(`[uc_roon] Subscribed: ${zone.display_name} (${zone.zone_id})`);
 
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.zone_id}`);
+							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
 							return;
 						}
 
