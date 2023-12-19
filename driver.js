@@ -235,6 +235,7 @@ let roon = new RoonApi({
 	publisher: "Unfolded Circle",
 	email: "support@unfoldedcircle.com",
 	website: "https://unfoldedcircle.com",
+	log_level: "none",  // #9 disable excessive msg logging (album art image buffer)
 
 	core_paired: async (core) => {
 		RoonCore = core;
