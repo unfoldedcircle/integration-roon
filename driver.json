@@ -1,6 +1,6 @@
 {
 	"driver_id": "uc_roon_driver",
-	"version": "0.2.4",
+	"version": "0.2.5",
 	"min_core_api": "0.20.0",
 	"name": { "en": "Roon" },
 	"icon": "uc:integration",
@@ -37,5 +37,5 @@
 			}
 		]
 	},
-	"release_date": "2023-11-17"
+	"release_date": "2023-12-19"
 }
