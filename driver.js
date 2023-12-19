@@ -76,53 +76,69 @@ uc.on(
 				break;
 
 			case uc.Entities.MediaPlayer.COMMANDS.VOLUME:
-				RoonTransport.change_volume(
-					RoonZones[entity_id].outputs[0].output_id,
-					"absolute",
-					params.volume,
-					async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					}
-				);
-				break;
-
-			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
-				RoonTransport.change_volume(
-					RoonZones[entity_id].outputs[0].output_id,
-					"relative_step", 1,
-					async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					}
-				);
-				break;
-
-			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
-				RoonTransport.change_volume(
-					RoonZones[entity_id].outputs[0].output_id,
-					"relative_step", -1,
-					async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					}
-				);
-				break;
-
-			case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
-				if (entity.attributes.muted) {
-					RoonTransport.mute(
+				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
+					RoonTransport.change_volume(
 						RoonZones[entity_id].outputs[0].output_id,
-						"unmute",
+						"absolute",
+						params.volume,
 						async (error) => {
 							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
 						}
 					);
 				} else {
-					RoonTransport.mute(
+					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+				}
+				break;
+
+			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
+				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
+					RoonTransport.change_volume(
 						RoonZones[entity_id].outputs[0].output_id,
-						"mute",
+						"relative_step", 1,
 						async (error) => {
 							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
 						}
 					);
+				} else {
+					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+				}
+				break;
+
+			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
+				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
+					RoonTransport.change_volume(
+						RoonZones[entity_id].outputs[0].output_id,
+						"relative_step", -1,
+						async (error) => {
+							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+						}
+					);
+				} else {
+					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+				}
+				break;
+
+			case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
+				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
+					if (entity.attributes.muted) {
+						RoonTransport.mute(
+							RoonZones[entity_id].outputs[0].output_id,
+							"unmute",
+							async (error) => {
+								await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+							}
+						);
+					} else {
+						RoonTransport.mute(
+							RoonZones[entity_id].outputs[0].output_id,
+							"mute",
+							async (error) => {
+								await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+							}
+						);
+					}
+				} else {
+					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
 				}
 				break;
 
@@ -148,12 +164,12 @@ uc.on(
 uc.on(uc.EVENTS.CONNECT, async () => {
 	roonExtentionStatus.set_status("Connected", false);
 	await getRoonZones(null);
-	uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
+	await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
 });
 
 uc.on(uc.EVENTS.DISCONNECT, async () => {
 	roonExtentionStatus.set_status("Disconnected", false);
-	uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+	await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
 uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
@@ -206,6 +222,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
 	await uc.acknowledgeCommand(wsHandle);
 	console.log('[uc_roon] Acknowledged driver setup');
 
+	// FIXME do not use hard coded paths! This MUST be in the defined integration data configured in an ENV var!
 	const img = convertImageToBase64('/opt/uc/integrations/roon/assets/setupimg.png');
 	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
 });
@@ -340,20 +357,20 @@ async function getRoonZones(wsHandle) {
 						[uc.Entities.MediaPlayer.ATTRIBUTES
 							.MEDIA_IMAGE_URL, ""],
 						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_TITLE, zone.now_playing
+							.MEDIA_TITLE, (zone.now_playing && zone.now_playing.three_line)
 							? zone.now_playing.three_line.line1
 							: ""],
 						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_ARTIST, zone.now_playing
+							.MEDIA_ARTIST, (zone.now_playing && zone.now_playing.three_line)
 							? zone.now_playing.three_line.line2
 							: ""],
 						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_ALBUM, zone.now_playing
+							.MEDIA_ALBUM, (zone.now_playing && zone.now_playing.three_line)
 							? zone.now_playing.three_line.line3
 							: ""]
 					]);
 
-					if (zone.outputs[0].volume) {
+					if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
 						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
 						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
 
@@ -426,7 +443,7 @@ async function subscribeRoonZones() {
 								break;
 						}
 
-						if (zone.outputs[0].volume) {
+						if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
 							// volume
 							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
 								zone.outputs[0].volume.value);
@@ -437,17 +454,19 @@ async function subscribeRoonZones() {
 						}
 
 						if (zone.now_playing) {
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-							], zone.now_playing.three_line.line1);
+							if (zone.now_playing.three_line) {
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
+								], zone.now_playing.three_line.line1);
 
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-							], zone.now_playing.three_line.line2);
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
+								], zone.now_playing.three_line.line2);
 
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-							], zone.now_playing.three_line.line3);
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
+								], zone.now_playing.three_line.line3);
+							}
 
 							response.set([
 								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
@@ -513,7 +532,7 @@ async function subscribeRoonZones() {
 								break;
 						}
 
-						if (zone.outputs[0].volume) {
+						if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
 							// volume
 							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
 								zone.outputs[0].volume.value);
@@ -524,17 +543,19 @@ async function subscribeRoonZones() {
 						}
 
 						if (zone.now_playing) {
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-							], zone.now_playing.three_line.line1);
+							if (zone.now_playing.three_line) {
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
+								], zone.now_playing.three_line.line1);
 
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-							], zone.now_playing.three_line.line2);
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
+								], zone.now_playing.three_line.line2);
 
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-							], zone.now_playing.three_line.line3);
+								response.set([
+									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
+								], zone.now_playing.three_line.line3);
+							}
 
 							response.set([
 								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
