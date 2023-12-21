@@ -170,6 +170,33 @@ uc.on(uc.EVENTS.CONNECT, async () => {
 	}
 });
 
+uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entityIds) => {
+	if (RoonCore == null) {
+		console.log("[uc_roon] Can't send entity data after subscribe: Roon core not available");
+		return;
+	}
+
+	const roonTransport = RoonCore.services.RoonApiTransport;
+
+	entityIds.forEach((entityId) => {
+		const entity = uc.configuredEntities.getEntity(entityId);
+		if (entity) {
+			console.log(`[uc_roon] Subscribe: ${entityId}`);
+
+			// update entity with current Zone information
+			const zone = roonTransport.zone_by_zone_id(entityId);
+			if (zone) {
+				console.log(`[uc_roon] Zone data: ${JSON.stringify(zone)}`);
+				let response = mediaPlayerAttributesFromZone(zone);
+				uc.configuredEntities.updateEntityAttributes(entityId, response);
+			} else {
+				// Send entity change with last known information to update UI
+				uc.emit(uc.EVENTS.ENTITY_ATTRIBUTES_UPDATED, entity.id, entity.entity_type, entity.attributes);
+			}
+		}
+	});
+});
+
 uc.on(uc.EVENTS.DISCONNECT, async () => {
 	roonExtentionStatus.set_status("Disconnected", false);
 	// TODO unsubscribe from Roon?
