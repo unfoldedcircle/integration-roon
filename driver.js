@@ -161,12 +161,18 @@ uc.on(
 
 uc.on(uc.EVENTS.CONNECT, async () => {
 	roonExtentionStatus.set_status("Connected", false);
-	await getRoonZones();
-	await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
+	try {
+		await getRoonZones();
+		await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
+	} catch (e) {
+		console.log(`[uc_roon] Failed to get Roon zones: ${e}`);
+		await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+	}
 });
 
 uc.on(uc.EVENTS.DISCONNECT, async () => {
 	roonExtentionStatus.set_status("Disconnected", false);
+	// TODO unsubscribe from Roon?
 	await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
@@ -277,19 +283,7 @@ async function getRoonZones() {
 
 				const res = uc.availableEntities.contains(zone.zone_id);
 				if (!res) {
-					let state;
-
-					switch (zone.state) {
-						case "playing":
-							state = uc.Entities.MediaPlayer.STATES.PLAYING;
-							break;
-
-						case "stopped":
-						case "paused":
-							state = uc.Entities.MediaPlayer.STATES.PAUSED;
-							break;
-					}
-
+					// TODO add & test REPEAT, SHUFFLE
 					let features = [
 						uc.Entities.MediaPlayer.FEATURES.ON_OFF,
 						uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
@@ -306,40 +300,13 @@ async function getRoonZones() {
 							.MEDIA_IMAGE_URL,
 					];
 
-					let attributes = new Map([
-						[uc.Entities.MediaPlayer.ATTRIBUTES.STATE,
-							state],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_DURATION, zone.now_playing
-							? zone.now_playing.length
-								? zone.now_playing.length
-								: 0
-							: 0],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_POSITION, 0],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_IMAGE_URL, ""],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_TITLE, (zone.now_playing && zone.now_playing.three_line)
-							? zone.now_playing.three_line.line1
-							: ""],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_ARTIST, (zone.now_playing && zone.now_playing.three_line)
-							? zone.now_playing.three_line.line2
-							: ""],
-						[uc.Entities.MediaPlayer.ATTRIBUTES
-							.MEDIA_ALBUM, (zone.now_playing && zone.now_playing.three_line)
-							? zone.now_playing.three_line.line3
-							: ""]
-					]);
-
 					if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+						// FIXME not all Roon zones support volume setting! Check for `type: incremental`
 						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
 						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
-
-						attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
-						attributes.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
 					}
+
+					const attributes = mediaPlayerAttributesFromZone(zone);
 
 					const entity = new uc.Entities.MediaPlayer(
 						zone.zone_id,
@@ -368,81 +335,13 @@ async function subscribeRoonZones() {
 		RoonTransport.subscribe_zones(async (cmd, data) => {
 			if (cmd === "Changed") {
 				if (data.zones_changed) {
-					data.zones_changed.forEach(async (zone) => {
+					data.zones_changed.forEach((zone) => {
 						console.log(`[uc_roon] Change: ${zone.display_name} (${zone.zone_id})`);
-
-						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
-							return;
-						}
-
-						let response = new Map([]);
-
-						// state
-						switch (zone.state) {
-							case "playing":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-									uc.Entities.MediaPlayer.STATES.PLAYING);
-								break;
-
-							case "stopped":
-							case "paused":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-									uc.Entities.MediaPlayer.STATES.PAUSED);
-								break;
-						}
-
-						if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-							// volume
-							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
-								zone.outputs[0].volume.value);
-
-							// muted
-							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
-								zone.outputs[0].volume.is_muted);
-						}
-
-						if (zone.now_playing) {
-							if (zone.now_playing.three_line) {
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-								], zone.now_playing.three_line.line1);
-
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-								], zone.now_playing.three_line.line2);
-
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-								], zone.now_playing.three_line.line3);
-							}
-
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
-							], zone.now_playing.length);
-
-							if (zone.now_playing.image_key) {
-								RoonImage.get_image(zone.now_playing.image_key, { scale: 'fit', width: 480, height: 480, format: 'image/jpeg' }, (error, content_type, image) => {
-									if (image) {
-										let imageResponse = new Map([]);
-										imageResponse.set([
-											uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-										], "data:image/png;base64," + image.toString('base64'));
-										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
-									}
-								});
-							} else {
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-								], "");
-							}
-						}
-
-						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
+						updateMediaPlayerFromZone(zone);
 					});
 
 				} else if (data.zones_seek_changed) {
-					data.zones_seek_changed.forEach(async (zone) => {
+					data.zones_seek_changed.forEach((zone) => {
 						if (!uc.configuredEntities.contains(zone.zone_id)) {
 							console.log(`[uc_roon] Configured entity not found, not updating seek: ${zone.display_name} (${zone.zone_id})`);
 							return;
@@ -457,87 +356,127 @@ async function subscribeRoonZones() {
 				}
 			} else if (cmd === "Subscribed") {
 				if (data.zones) {
-					data.zones.forEach(async (zone) => {
+					data.zones.forEach((zone) => {
 						console.log(`[uc_roon] Subscribed: ${zone.display_name} (${zone.zone_id})`);
-
-						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
-							return;
-						}
-
-						let response = new Map([]);
-
-						// state
-						switch (zone.state) {
-							case "playing":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-									uc.Entities.MediaPlayer.STATES.PLAYING);
-								break;
-
-							case "stopped":
-							case "paused":
-								response.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-									uc.Entities.MediaPlayer.STATES.PAUSED);
-								break;
-						}
-
-						if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-							// volume
-							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
-								zone.outputs[0].volume.value);
-
-							// muted
-							response.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
-								zone.outputs[0].volume.is_muted);
-						}
-
-						if (zone.now_playing) {
-							if (zone.now_playing.three_line) {
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE
-								], zone.now_playing.three_line.line1);
-
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST
-								], zone.now_playing.three_line.line2);
-
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM
-								], zone.now_playing.three_line.line3);
-							}
-
-							response.set([
-								uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION
-							], zone.now_playing.length);
-
-							if (zone.now_playing.image_key) {
-								RoonImage.get_image(zone.now_playing.image_key, {
-									scale: 'fit',
-									width: 480,
-									height: 480,
-									format: 'image/jpeg'
-								}, (error, content_type, image) => {
-									if (image) {
-										let imageResponse = new Map([]);
-										imageResponse.set([
-											uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-										], "data:image/png;base64," + image.toString('base64'));
-										uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
-									}
-								});
-							} else {
-								response.set([
-									uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-								], "");
-							}
-						}
-
-						uc.configuredEntities.updateEntityAttributes(zone.zone_id, response);
+						updateMediaPlayerFromZone(zone);
 					});
 				}
 			}
 		});
 	}
+}
+
+/**
+ * Update configured media-player entity from given zone.
+ *
+ * @param {Object} zone The Roon zone
+ */
+function updateMediaPlayerFromZone(zone) {
+	if (!zone) {
+		return;
+	}
+
+	if (!uc.configuredEntities.contains(zone.zone_id)) {
+		console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
+		return;
+	}
+
+	let attr = mediaPlayerAttributesFromZone(zone);
+
+	if (zone.now_playing) {
+		// TODO cache image key to avoid multiple calls
+		if (zone.now_playing.image_key) {
+			RoonImage.get_image(zone.now_playing.image_key, {
+				scale: 'fit',
+				width: 480,
+				height: 480,
+				format: 'image/jpeg'
+			}, (error, content_type, image) => {
+				if (image) {
+					let imageResponse = new Map([]);
+					imageResponse.set([
+						uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+					], "data:image/png;base64," + image.toString('base64'));
+					uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+				}
+			});
+		} else {
+			attr.set([
+				uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
+			], "");
+		}
+	}
+
+	uc.configuredEntities.updateEntityAttributes(zone.zone_id, attr);
+}
+
+/**
+ * Extract media-player attributes from what's playing in the given Roon zone.
+ *
+ * The media image is not updated. This must be handled manually to avoid excessive media image fetching.
+ *
+ * @param {Object} zone The Roon zone
+ * @returns {Map<string, any>} media-player attribute map
+ */
+function mediaPlayerAttributesFromZone(zone) {
+	let attr = new Map([]);
+
+	if (!zone) {
+		return attr;
+	}
+
+	// state
+	switch (zone.state) {
+		case "playing":
+			attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
+				uc.Entities.MediaPlayer.STATES.PLAYING);
+			break;
+
+		case "stopped":
+		case "paused":
+			attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
+				uc.Entities.MediaPlayer.STATES.PAUSED);
+			break;
+	}
+
+	if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+		// volume
+		attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
+			zone.outputs[0].volume.value);
+
+		// muted
+		attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
+			zone.outputs[0].volume.is_muted);
+	}
+
+	let media_duration = 0;
+	let media_position = 0;
+	let media_title = "";
+	let media_artist = "";
+	let media_album = "";
+
+	if (zone.now_playing) {
+		if (zone.now_playing.three_line) {
+			media_title = zone.now_playing.three_line.line1;
+			media_artist = zone.now_playing.three_line.line2;
+			media_album = zone.now_playing.three_line.line3
+		}
+
+		if (zone.now_playing.length) {
+			media_duration = zone.now_playing.length;
+		}
+		if (zone.now_playing.seek_position) {
+			media_position = zone.now_playing.seek_position;
+		}
+	}
+
+	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE], media_title);
+	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST], media_artist);
+	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM], media_album);
+	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION], media_duration);
+	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION], media_position);
+
+	return attr;
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -564,4 +503,4 @@ async function init() {
 	roon.start_discovery();
 }
 
-init();
+void init();
