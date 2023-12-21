@@ -18,8 +18,6 @@ let RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
 
-let subscribedEntities = [];
-
 // set working directory
 const process = require('process')
 try {
@@ -37,7 +35,7 @@ uc.on(
 		);
 
 		if (!RoonPaired) {
-			console.error(`[uc_roon] Roon is not paird. Not executing command ${cmd_id}`);
+			console.error(`[uc_roon] Roon is not paired. Not executing command ${cmd_id}`);
 		}
 
 		const entity = uc.configuredEntities.getEntity(entity_id);
@@ -163,7 +161,7 @@ uc.on(
 
 uc.on(uc.EVENTS.CONNECT, async () => {
 	roonExtentionStatus.set_status("Connected", false);
-	await getRoonZones(null);
+	await getRoonZones();
 	await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
 });
 
@@ -172,47 +170,12 @@ uc.on(uc.EVENTS.DISCONNECT, async () => {
 	await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
-uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
-	if (!entityIds) {
-		subscribedEntities.length = 0;
-		return;
-	}
-
-	subscribedEntities = entityIds;
-
-	entityIds.forEach(async (entityId) => {
-		const entity = uc.availableEntities.getEntity(entityId);
-		if (entity == null) {
-			console.error(`[uc_roon] Available entity not found: ${entityId}`);
-			await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.NOT_FOUND);
-			return;
-		}
-
-		uc.configuredEntities.addEntity(entity);
-	});
-
-	await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.OK);
-});
-
-uc.on(uc.EVENTS.UNSUBSCRIBE_ENTITIES, async (wsHandle, entityIds) => {
-	entityIds.forEach(async (entityId) => {
-		console.debug(`[uc_roon] Unsubscribe: ${entityId}`);
-		uc.configuredEntities.removeEntity(entityId);
-	});
-
-	await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.OK);
-});
-
 uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
 	roonExtentionStatus.set_status("Disconnected", false);
 });
 
 uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
 	roonExtentionStatus.set_status("Connected", false);
-});
-
-uc.on(uc.EVENTS.GET_AVAILABLE_ENTITIES, async (wsHandle) => {
-	await getRoonZones(wsHandle);
 });
 
 // DRIVER SETUP
@@ -239,7 +202,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
 
 	if (RoonPaired) {
 		console.log('[uc_roon] Driver setup completed!');
-		await getRoonZones(null);
+		await getRoonZones();
 		await uc.driverSetupComplete(wsHandle);
 	} else {
 		await uc.driverSetupError(wsHandle, 'Failed to pair with Roon.');
@@ -268,7 +231,7 @@ let roon = new RoonApi({
 			`[uc_roon] Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
 		);
 
-		await getRoonZones(null);
+		await getRoonZones();
 		await subscribeRoonZones();
 	},
 
@@ -295,7 +258,7 @@ let roon = new RoonApi({
 
 const roonExtentionStatus = new RoonApiStatus(roon);
 
-async function getRoonZones(wsHandle) {
+async function getRoonZones() {
 	if (RoonCore != null) {
 		console.log("[uc_roon] Getting Roon Zones");
 		RoonTransport = RoonCore.services.RoonApiTransport;
@@ -388,20 +351,6 @@ async function getRoonZones(wsHandle) {
 					);
 
 					uc.availableEntities.addEntity(entity);
-				}
-			}
-
-			if (wsHandle != null) {
-				await uc.sendAvailableEntities(wsHandle);
-			}
-
-			if (subscribedEntities) {
-				for (const entityId of subscribedEntities) {
-					const entity = uc.availableEntities.getEntity(entityId);
-					console.debug(`Entity is: ${entity}`);
-					if (entity != null) {
-						uc.configuredEntities.addEntity(entity);
-					}
 				}
 			}
 
