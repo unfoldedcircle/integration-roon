@@ -9,10 +9,10 @@
 	"author": "Unfolded Circle",
 	"license": "ISC",
 	"dependencies": {
-		"node-roon-api": "github:roonlabs/node-roon-api",
-		"node-roon-api-image": "github:roonlabs/node-roon-api-image",
-		"node-roon-api-status": "github:roonlabs/node-roon-api-status",
-		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport",
+		"node-roon-api": "github:roonlabs/node-roon-api#7cfaddc63b0d8a8bffe0f71df02d7c73adc728a5",
+		"node-roon-api-image": "github:roonlabs/node-roon-api-image#a5f0efaf2dfb5457e91abe326c3a40d865131d32",
+		"node-roon-api-status": "github:roonlabs/node-roon-api-status#504c918d6da267e03fbb4337befa71ca3d3c7526",
+		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport#2ee60008a4cdb90c34ff3de58bb4b949067f1d20",
 		"uc-integration-api": "git+https://github.com/unfoldedcircle/integration-node-library.git#18e552698c14eca05347f0e666ff11dc56b94e1e",
 		"ws": "^8.15.1"
 	}
