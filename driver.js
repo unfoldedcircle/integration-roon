@@ -18,15 +18,6 @@ let RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
 
-// set working directory
-const process = require('process')
-try {
-	process.chdir(uc.configDirPath);
-	console.log(`[uc_roon] Changed working directory to: ${uc.configDirPath}`);
-} catch (error) {
-	console.error(`[uc_roon] Error changing working directory: ${error}`);
-}
-
 uc.on(
 	uc.EVENTS.ENTITY_COMMAND,
 	async (wsHandle, entity_id, entity_type, cmd_id, params) => {
@@ -218,8 +209,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
 	await uc.acknowledgeCommand(wsHandle);
 	console.log('[uc_roon] Acknowledged driver setup');
 
-	// FIXME do not use hard coded paths! This MUST be in the defined integration data configured in an ENV var!
-	const img = convertImageToBase64('/opt/uc/integrations/roon/assets/setupimg.png');
+	const img = convertImageToBase64('./assets/setupimg.png');
 	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
 });
 
