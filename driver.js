@@ -9,378 +9,346 @@ const RoonApiTransport = require("node-roon-api-transport");
 const RoonApiImage = require("node-roon-api-image");
 const fs = require("fs");
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // roon global variables
 let RoonCore = null;
 let RoonTransport = null;
-let RoonZones = {};
+const RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
 
-uc.on(
-	uc.EVENTS.ENTITY_COMMAND,
-	async (wsHandle, entity_id, entity_type, cmd_id, params) => {
-		console.log(
-			`[uc_roon] ENTITY COMMAND: ${wsHandle} ${entity_id} ${entity_type} ${cmd_id}`
-		);
+uc.on(uc.EVENTS.ENTITY_COMMAND, async (wsHandle, entityId, entityType, cmdId, params) => {
+  console.log(`[uc_roon] ENTITY COMMAND: ${wsHandle} ${entityId} ${entityType} ${cmdId}`);
 
-		if (!RoonPaired) {
-			console.error(`[uc_roon] Roon is not paired. Not executing command ${cmd_id}`);
-		}
+  if (!RoonPaired) {
+    console.error(`[uc_roon] Roon is not paired. Not executing command ${cmdId}`);
+  }
 
-		const entity = uc.configuredEntities.getEntity(entity_id);
-		if (entity == null) {
-			console.warn(`[uc_roon] Entity ${entity_id} is not configured: cannot execute command ${cmd_id}`)
-			await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
-			return
-		}
+  const entity = uc.configuredEntities.getEntity(entityId);
+  if (entity == null) {
+    console.warn(`[uc_roon] Entity ${entityId} is not configured: cannot execute command ${cmdId}`);
+    await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
+    return;
+  }
 
-		switch (cmd_id) {
-			case uc.Entities.MediaPlayer.COMMANDS.PLAY_PAUSE:
-				if (
-					entity.attributes.state ===
-					uc.Entities.MediaPlayer.STATES.PLAYING
-				) {
-					RoonTransport.control(entity_id, "pause", async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					});
-				} else {
-					RoonTransport.control(entity_id, "play", async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					});
-				}
-				break;
+  switch (cmdId) {
+    case uc.Entities.MediaPlayer.COMMANDS.PLAY_PAUSE:
+      if (entity.attributes.state === uc.Entities.MediaPlayer.STATES.PLAYING) {
+        RoonTransport.control(entityId, "pause", async (error) => {
+          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+        });
+      } else {
+        RoonTransport.control(entityId, "play", async (error) => {
+          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+        });
+      }
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.NEXT:
-				RoonTransport.control(entity_id, "next", async (error) => {
-					await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-				});
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.NEXT:
+      RoonTransport.control(entityId, "next", async (error) => {
+        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+      });
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.PREVIOUS:
-				RoonTransport.control(entity_id, "previous", async (error) => {
-					await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-				});
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.PREVIOUS:
+      RoonTransport.control(entityId, "previous", async (error) => {
+        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+      });
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.VOLUME:
-				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
-					RoonTransport.change_volume(
-						RoonZones[entity_id].outputs[0].output_id,
-						"absolute",
-						params.volume,
-						async (error) => {
-							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-						}
-					);
-				} else {
-					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
-				}
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.VOLUME:
+      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+        RoonTransport.change_volume(
+          RoonZones[entityId].outputs[0].output_id,
+          "absolute",
+          params.volume,
+          async (error) => {
+            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+          }
+        );
+      } else {
+        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+      }
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
-				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
-					RoonTransport.change_volume(
-						RoonZones[entity_id].outputs[0].output_id,
-						"relative_step", 1,
-						async (error) => {
-							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-						}
-					);
-				} else {
-					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
-				}
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
+      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+        RoonTransport.change_volume(RoonZones[entityId].outputs[0].output_id, "relative_step", 1, async (error) => {
+          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+        });
+      } else {
+        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+      }
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
-				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
-					RoonTransport.change_volume(
-						RoonZones[entity_id].outputs[0].output_id,
-						"relative_step", -1,
-						async (error) => {
-							await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-						}
-					);
-				} else {
-					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
-				}
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
+      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+        RoonTransport.change_volume(RoonZones[entityId].outputs[0].output_id, "relative_step", -1, async (error) => {
+          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+        });
+      } else {
+        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+      }
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
-				if (RoonZones[entity_id] && RoonZones[entity_id].outputs && RoonZones[entity_id].outputs[0]) {
-					if (entity.attributes.muted) {
-						RoonTransport.mute(
-							RoonZones[entity_id].outputs[0].output_id,
-							"unmute",
-							async (error) => {
-								await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-							}
-						);
-					} else {
-						RoonTransport.mute(
-							RoonZones[entity_id].outputs[0].output_id,
-							"mute",
-							async (error) => {
-								await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-							}
-						);
-					}
-				} else {
-					await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
-				}
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
+      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+        if (entity.attributes.muted) {
+          RoonTransport.mute(RoonZones[entityId].outputs[0].output_id, "unmute", async (error) => {
+            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+          });
+        } else {
+          RoonTransport.mute(RoonZones[entityId].outputs[0].output_id, "mute", async (error) => {
+            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+          });
+        }
+      } else {
+        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+      }
+      break;
 
-			case uc.Entities.MediaPlayer.COMMANDS.SEEK:
-				RoonTransport.seek(
-					entity_id,
-					"absolute",
-					params.media_position,
-					async (error) => {
-						await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
-					}
-				);
-				break;
+    case uc.Entities.MediaPlayer.COMMANDS.SEEK:
+      RoonTransport.seek(entityId, "absolute", params.media_position, async (error) => {
+        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+      });
+      break;
 
-			default:
-				console.warn(`[uc_roon] Unknown entity command: ${cmd_id}`)
-				await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
-				break;
-		}
-	}
-);
+    default:
+      console.warn(`[uc_roon] Unknown entity command: ${cmdId}`);
+      await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
+      break;
+  }
+});
 
 uc.on(uc.EVENTS.CONNECT, async () => {
-	roonExtentionStatus.set_status("Connected", false);
-	try {
-		await getRoonZones();
-		await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
-	} catch (e) {
-		console.log(`[uc_roon] Failed to get Roon zones: ${e}`);
-		await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
-	}
+  roonExtentionStatus.set_status("Connected", false);
+  try {
+    await getRoonZones();
+    await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
+  } catch (e) {
+    console.log(`[uc_roon] Failed to get Roon zones: ${e}`);
+    await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+  }
 });
 
 uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entityIds) => {
-	if (RoonCore == null) {
-		console.log("[uc_roon] Can't send entity data after subscribe: Roon core not available");
-		return;
-	}
+  if (RoonCore == null) {
+    console.log("[uc_roon] Can't send entity data after subscribe: Roon core not available");
+    return;
+  }
 
-	const roonTransport = RoonCore.services.RoonApiTransport;
+  const roonTransport = RoonCore.services.RoonApiTransport;
 
-	entityIds.forEach((entityId) => {
-		const entity = uc.configuredEntities.getEntity(entityId);
-		if (entity) {
-			console.log(`[uc_roon] Subscribe: ${entityId}`);
+  entityIds.forEach((entityId) => {
+    const entity = uc.configuredEntities.getEntity(entityId);
+    if (entity) {
+      console.log(`[uc_roon] Subscribe: ${entityId}`);
 
-			// update entity with current Zone information
-			const zone = roonTransport.zone_by_zone_id(entityId);
-			if (zone) {
-				console.log(`[uc_roon] Zone data: ${JSON.stringify(zone)}`);
-				let response = mediaPlayerAttributesFromZone(zone);
-				uc.configuredEntities.updateEntityAttributes(entityId, response);
-			} else {
-				// Send entity change with last known information to update UI
-				uc.emit(uc.EVENTS.ENTITY_ATTRIBUTES_UPDATED, entity.id, entity.entity_type, entity.attributes);
-			}
-		}
-	});
+      // update entity with current Zone information
+      const zone = roonTransport.zone_by_zone_id(entityId);
+      if (zone) {
+        console.log(`[uc_roon] Zone data: ${JSON.stringify(zone)}`);
+        const attr = mediaPlayerAttributesFromZone(zone);
+        uc.configuredEntities.updateEntityAttributes(entityId, attr);
+      } else {
+        // Send entity change with last known information to update UI
+        uc.emit(uc.EVENTS.ENTITY_ATTRIBUTES_UPDATED, entity.id, entity.entity_type, entity.attributes);
+      }
+    }
+  });
 });
 
 uc.on(uc.EVENTS.DISCONNECT, async () => {
-	roonExtentionStatus.set_status("Disconnected", false);
-	// TODO unsubscribe from Roon?
-	await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+  roonExtentionStatus.set_status("Disconnected", false);
+  // TODO unsubscribe from Roon?
+  await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
 });
 
 uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
-	roonExtentionStatus.set_status("Disconnected", false);
+  roonExtentionStatus.set_status("Disconnected", false);
 });
 
 uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
-	roonExtentionStatus.set_status("Connected", false);
+  roonExtentionStatus.set_status("Connected", false);
 });
 
 // DRIVER SETUP
 uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
-	console.log(`[uc_roon] Setting up driver. Setup data: ${setupData}`);
+  console.log(`[uc_roon] Setting up driver. Setup data: ${setupData}`);
 
-	await uc.acknowledgeCommand(wsHandle);
-	console.log('[uc_roon] Acknowledged driver setup');
+  await uc.acknowledgeCommand(wsHandle);
+  console.log("[uc_roon] Acknowledged driver setup");
 
-	const img = convertImageToBase64('./assets/setupimg.png');
-	await uc.requestDriverSetupUserConfirmation(wsHandle, 'User action needed', 'Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.', img);
+  const img = convertImageToBase64("./assets/setupimg.png");
+  await uc.requestDriverSetupUserConfirmation(
+    wsHandle,
+    "User action needed",
+    "Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.",
+    img
+  );
 });
 
 uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
-	console.log('[uc_roon] Received user confirmation for driver setup: sending OK');
-	await uc.acknowledgeCommand(wsHandle);
+  console.log("[uc_roon] Received user confirmation for driver setup: sending OK");
+  await uc.acknowledgeCommand(wsHandle);
 
-	// Update setup progress
-	await uc.driverSetupProgress(wsHandle);
-	console.log('[uc_roon] Sending setup progress that we are still busy...');
+  // Update setup progress
+  await uc.driverSetupProgress(wsHandle);
+  console.log("[uc_roon] Sending setup progress that we are still busy...");
 
-	await delay(3000);
+  await delay(3000);
 
-	if (RoonPaired) {
-		console.log('[uc_roon] Driver setup completed!');
-		await getRoonZones();
-		await uc.driverSetupComplete(wsHandle);
-	} else {
-		await uc.driverSetupError(wsHandle, 'Failed to pair with Roon.');
-		console.error("[uc_roon] Failed to pair with Roon");
-	}
+  if (RoonPaired) {
+    console.log("[uc_roon] Driver setup completed!");
+    await getRoonZones();
+    await uc.driverSetupComplete(wsHandle);
+  } else {
+    await uc.driverSetupError(wsHandle, "Failed to pair with Roon.");
+    console.error("[uc_roon] Failed to pair with Roon");
+  }
 });
 // END DRIVER SETUP
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-let roon = new RoonApi({
-	extension_id: "com.uc.remote",
-	display_name: "Unfolded Circle Roon Integration",
-	display_version: uc.getDriverVersion().version.driver,
-	publisher: "Unfolded Circle",
-	email: "support@unfoldedcircle.com",
-	website: "https://unfoldedcircle.com",
-	log_level: "none",  // #9 disable excessive msg logging (album art image buffer)
+const roon = new RoonApi({
+  extension_id: "com.uc.remote",
+  display_name: "Unfolded Circle Roon Integration",
+  display_version: uc.getDriverVersion().version.driver,
+  publisher: "Unfolded Circle",
+  email: "support@unfoldedcircle.com",
+  website: "https://unfoldedcircle.com",
+  log_level: "none", // #9 disable excessive msg logging (album art image buffer)
 
-	core_paired: async (core) => {
-		RoonCore = core;
-		RoonPaired = true;
-		RoonImage = new RoonApiImage(core);
+  core_paired: async (core) => {
+    RoonCore = core;
+    RoonPaired = true;
+    RoonImage = new RoonApiImage(core);
 
-		console.log(
-			`[uc_roon] Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`
-		);
+    console.log(`[uc_roon] Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
-		await getRoonZones();
-		await subscribeRoonZones();
-	},
+    await getRoonZones();
+    await subscribeRoonZones();
+  },
 
-	core_unpaired: (core) => {
-		RoonPaired = false;
+  core_unpaired: (core) => {
+    RoonPaired = false;
 
-		console.log(
-			`[uc_roon] Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`
-		);
+    console.log(`[uc_roon] Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
-		const entities = uc.configuredEntities.getEntities();
+    const entities = uc.configuredEntities.getEntities();
 
-		for (const entity of entities) {
-			if (entity.entity_id) {
-				let response = new Map([]);
-				response.set([uc.Entities.Light.ATTRIBUTES.STATE], uc.Entities.Light.STATES.UNAVAILABLE);
-				uc.configuredEntities.updateEntityAttributes(entity.entity_id, response);
-			}
-		}
+    for (const entity of entities) {
+      if (entity.entity_id) {
+        const attr = new Map([]);
+        attr.set([uc.Entities.Light.ATTRIBUTES.STATE], uc.Entities.Light.STATES.UNAVAILABLE);
+        uc.configuredEntities.updateEntityAttributes(entity.entity_id, attr);
+      }
+    }
 
-		// TODO(marton): Do we need to do anything here? It seems like it pairs automatically again after some time.
-	},
+    // TODO(marton): Do we need to do anything here? It seems like it pairs automatically again after some time.
+  }
 });
 
 const roonExtentionStatus = new RoonApiStatus(roon);
 
 async function getRoonZones() {
-	if (RoonCore != null) {
-		console.log("[uc_roon] Getting Roon Zones");
-		RoonTransport = RoonCore.services.RoonApiTransport;
+  if (RoonCore != null) {
+    console.log("[uc_roon] Getting Roon Zones");
+    RoonTransport = RoonCore.services.RoonApiTransport;
 
-		RoonTransport.get_zones(async (error, data) => {
-			if (error) {
-				console.log("[uc_roon] Failed to get Roon Zones");
-				return
-			}
+    RoonTransport.get_zones(async (error, data) => {
+      if (error) {
+        console.log("[uc_roon] Failed to get Roon Zones");
+        return;
+      }
 
-			for (const zone of data.zones) {
-				console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
-				RoonZones[zone.zone_id] = {
-					outputs: zone.outputs,
-				};
+      for (const zone of data.zones) {
+        console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
+        RoonZones[zone.zone_id] = {
+          outputs: zone.outputs
+        };
 
-				const res = uc.availableEntities.contains(zone.zone_id);
-				if (!res) {
-					// TODO add & test REPEAT, SHUFFLE
-					let features = [
-						uc.Entities.MediaPlayer.FEATURES.ON_OFF,
-						uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
-						uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
-						uc.Entities.MediaPlayer.FEATURES.NEXT,
-						uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
-						uc.Entities.MediaPlayer.FEATURES.SEEK,
-						uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
-						uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
-						uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
-						uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
-						uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
-						uc.Entities.MediaPlayer.FEATURES
-							.MEDIA_IMAGE_URL,
-					];
+        const res = uc.availableEntities.contains(zone.zone_id);
+        if (!res) {
+          // TODO add & test REPEAT, SHUFFLE
+          const features = [
+            uc.Entities.MediaPlayer.FEATURES.ON_OFF,
+            uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
+            uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
+            uc.Entities.MediaPlayer.FEATURES.NEXT,
+            uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
+            uc.Entities.MediaPlayer.FEATURES.SEEK,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
+            uc.Entities.MediaPlayer.FEATURES.MEDIA_IMAGE_URL
+          ];
 
-					if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-						// FIXME not all Roon zones support volume setting! Check for `type: incremental`
-						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
-						features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
-					}
+          if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+            // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
+            features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
+            features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
+          }
 
-					const attributes = mediaPlayerAttributesFromZone(zone);
+          const attributes = mediaPlayerAttributesFromZone(zone);
 
-					const entity = new uc.Entities.MediaPlayer(
-						zone.zone_id,
-						new Map([[
-							'en', zone.display_name
-						]]),
-						features,
-						attributes
-					);
+          const entity = new uc.Entities.MediaPlayer(
+            zone.zone_id,
+            new Map([["en", zone.display_name]]),
+            features,
+            attributes
+          );
 
-					uc.availableEntities.addEntity(entity);
-				}
-			}
-
-		});
-	} else {
-		console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
-	}
+          uc.availableEntities.addEntity(entity);
+        }
+      }
+    });
+  } else {
+    console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
+  }
 }
 
 async function subscribeRoonZones() {
-	// add event listeners to roon
-	if (RoonCore != null) {
-		RoonTransport = RoonCore.services.RoonApiTransport;
+  // add event listeners to roon
+  if (RoonCore != null) {
+    RoonTransport = RoonCore.services.RoonApiTransport;
 
-		RoonTransport.subscribe_zones(async (cmd, data) => {
-			if (cmd === "Changed") {
-				if (data.zones_changed) {
-					data.zones_changed.forEach((zone) => {
-						console.log(`[uc_roon] Change: ${zone.display_name} (${zone.zone_id})`);
-						updateMediaPlayerFromZone(zone);
-					});
+    RoonTransport.subscribe_zones(async (cmd, data) => {
+      if (cmd === "Changed") {
+        if (data.zones_changed) {
+          data.zones_changed.forEach((zone) => {
+            console.log(`[uc_roon] Change: ${zone.display_name} (${zone.zone_id})`);
+            updateMediaPlayerFromZone(zone);
+          });
+        } else if (data.zones_seek_changed) {
+          data.zones_seek_changed.forEach((zone) => {
+            if (!uc.configuredEntities.contains(zone.zone_id)) {
+              console.log(
+                `[uc_roon] Configured entity not found, not updating seek: ${zone.display_name} (${zone.zone_id})`
+              );
+              return;
+            }
 
-				} else if (data.zones_seek_changed) {
-					data.zones_seek_changed.forEach((zone) => {
-						if (!uc.configuredEntities.contains(zone.zone_id)) {
-							console.log(`[uc_roon] Configured entity not found, not updating seek: ${zone.display_name} (${zone.zone_id})`);
-							return;
-						}
-
-						uc.configuredEntities.updateEntityAttributes(
-							zone.zone_id,
-							new Map([
-								[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION, zone.seek_position]
-							]));
-					});
-				}
-			} else if (cmd === "Subscribed") {
-				if (data.zones) {
-					data.zones.forEach((zone) => {
-						console.log(`[uc_roon] Subscribed: ${zone.display_name} (${zone.zone_id})`);
-						updateMediaPlayerFromZone(zone);
-					});
-				}
-			}
-		});
-	}
+            uc.configuredEntities.updateEntityAttributes(
+              zone.zone_id,
+              new Map([[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION, zone.seek_position]])
+            );
+          });
+        }
+      } else if (cmd === "Subscribed") {
+        if (data.zones) {
+          data.zones.forEach((zone) => {
+            console.log(`[uc_roon] Subscribed: ${zone.display_name} (${zone.zone_id})`);
+            updateMediaPlayerFromZone(zone);
+          });
+        }
+      }
+    });
+  }
 }
 
 /**
@@ -389,42 +357,47 @@ async function subscribeRoonZones() {
  * @param {Object} zone The Roon zone
  */
 function updateMediaPlayerFromZone(zone) {
-	if (!zone) {
-		return;
-	}
+  if (!zone) {
+    return;
+  }
 
-	if (!uc.configuredEntities.contains(zone.zone_id)) {
-		console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
-		return;
-	}
+  if (!uc.configuredEntities.contains(zone.zone_id)) {
+    console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
+    return;
+  }
 
-	let attr = mediaPlayerAttributesFromZone(zone);
+  const attr = mediaPlayerAttributesFromZone(zone);
 
-	if (zone.now_playing) {
-		// TODO cache image key to avoid multiple calls
-		if (zone.now_playing.image_key) {
-			RoonImage.get_image(zone.now_playing.image_key, {
-				scale: 'fit',
-				width: 480,
-				height: 480,
-				format: 'image/jpeg'
-			}, (error, content_type, image) => {
-				if (image) {
-					let imageResponse = new Map([]);
-					imageResponse.set([
-						uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-					], "data:image/png;base64," + image.toString('base64'));
-					uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
-				}
-			});
-		} else {
-			attr.set([
-				uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL
-			], "");
-		}
-	}
+  if (zone.now_playing) {
+    // TODO cache image key to avoid multiple calls
+    if (zone.now_playing.image_key) {
+      RoonImage.get_image(
+        zone.now_playing.image_key,
+        {
+          scale: "fit",
+          width: 480,
+          height: 480,
+          format: "image/jpeg"
+        },
+        (error, contentType, image) => {
+          if (error) {
+            console.log(`[uc_roon] Failed to get image: ${error}`);
+          } else if (image) {
+            const imageResponse = new Map([]);
+            imageResponse.set(
+              [uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL],
+              "data:image/png;base64," + image.toString("base64")
+            );
+            uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+          }
+        }
+      );
+    } else {
+      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL], "");
+    }
+  }
 
-	uc.configuredEntities.updateEntityAttributes(zone.zone_id, attr);
+  uc.configuredEntities.updateEntityAttributes(zone.zone_id, attr);
 }
 
 /**
@@ -436,88 +409,84 @@ function updateMediaPlayerFromZone(zone) {
  * @returns {Map<string, any>} media-player attribute map
  */
 function mediaPlayerAttributesFromZone(zone) {
-	let attr = new Map([]);
+  const attr = new Map([]);
 
-	if (!zone) {
-		return attr;
-	}
+  if (!zone) {
+    return attr;
+  }
 
-	// state
-	switch (zone.state) {
-		case "playing":
-			attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-				uc.Entities.MediaPlayer.STATES.PLAYING);
-			break;
+  // state
+  switch (zone.state) {
+    case "playing":
+      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], uc.Entities.MediaPlayer.STATES.PLAYING);
+      break;
 
-		case "stopped":
-		case "paused":
-			attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE],
-				uc.Entities.MediaPlayer.STATES.PAUSED);
-			break;
-	}
+    case "stopped":
+    case "paused":
+      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], uc.Entities.MediaPlayer.STATES.PAUSED);
+      break;
+  }
 
-	if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-		// volume
-		attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME],
-			zone.outputs[0].volume.value);
+  if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+    // volume
+    attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
 
-		// muted
-		attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED],
-			zone.outputs[0].volume.is_muted);
-	}
+    // muted
+    attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
+  }
 
-	let media_duration = 0;
-	let media_position = 0;
-	let media_title = "";
-	let media_artist = "";
-	let media_album = "";
+  let mediaDuration = 0;
+  let mediaPosition = 0;
+  let mediaTitle = "";
+  let mediaArtist = "";
+  let mediaAlbum = "";
 
-	if (zone.now_playing) {
-		if (zone.now_playing.three_line) {
-			media_title = zone.now_playing.three_line.line1;
-			media_artist = zone.now_playing.three_line.line2;
-			media_album = zone.now_playing.three_line.line3
-		}
+  if (zone.now_playing) {
+    if (zone.now_playing.three_line) {
+      mediaTitle = zone.now_playing.three_line.line1;
+      mediaArtist = zone.now_playing.three_line.line2;
+      mediaAlbum = zone.now_playing.three_line.line3;
+    }
 
-		if (zone.now_playing.length) {
-			media_duration = zone.now_playing.length;
-		}
-		if (zone.now_playing.seek_position) {
-			media_position = zone.now_playing.seek_position;
-		}
-	}
+    if (zone.now_playing.length) {
+      mediaDuration = zone.now_playing.length;
+    }
+    if (zone.now_playing.seek_position) {
+      mediaPosition = zone.now_playing.seek_position;
+    }
+  }
 
-	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE], media_title);
-	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST], media_artist);
-	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM], media_album);
-	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION], media_duration);
-	attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION], media_position);
+  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE], mediaTitle);
+  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST], mediaArtist);
+  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM], mediaAlbum);
+  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION], mediaDuration);
+  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION], mediaPosition);
 
-	return attr;
+  return attr;
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 function convertImageToBase64(file) {
-	let data = null;
+  let data = null;
 
-	try {
-		data = fs.readFileSync(file, 'base64');
-	} catch (e) {
-		console.log(e);
-	}
+  try {
+    data = fs.readFileSync(file, "base64");
+  } catch (e) {
+    console.log(e);
+  }
 
-	return data;
+  return data;
 }
 
 async function init() {
-	roon.init_services({
-		required_services: [RoonApiTransport, RoonApiImage],
-		provided_services: [roonExtentionStatus],
-	});
+  roon.init_services({
+    required_services: [RoonApiTransport, RoonApiImage],
+    provided_services: [roonExtentionStatus]
+  });
 
-	roonExtentionStatus.set_status("Disconnected", false);
+  roonExtentionStatus.set_status("Disconnected", false);
 
-	roon.start_discovery();
+  roon.start_discovery();
 }
 
-void init();
+init();

@@ -4,6 +4,8 @@
 	"description": "Roon Integration for the Unfolded Circle",
 	"main": "driver.js",
 	"scripts": {
+		"format": "prettier --write driver.js",
+		"lint": "prettier --check driver.js && eslint . --ext .js,.jsx,.ts,.tsx",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Unfolded Circle",
@@ -15,5 +17,16 @@
 		"node-roon-api-transport": "github:roonlabs/node-roon-api-transport#2ee60008a4cdb90c34ff3de58bb4b949067f1d20",
 		"uc-integration-api": "git+https://github.com/unfoldedcircle/integration-node-library.git#18e552698c14eca05347f0e666ff11dc56b94e1e",
 		"ws": "^8.15.1"
+	},
+	"devDependencies": {
+		"eslint": "^8.35.0",
+		"eslint-config-prettier": "8.8.0",
+		"eslint-config-semistandard": "^17.0.0",
+		"eslint-config-standard": "^17.0.0",
+		"eslint-plugin-import": "^2.27.5",
+		"eslint-plugin-n": "^15.6.1",
+		"eslint-plugin-prettier": "4.2.1",
+		"eslint-plugin-promise": "^6.1.1",
+		"prettier": "^2.8.8"
 	}
 }
