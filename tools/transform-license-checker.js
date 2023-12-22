@@ -50,7 +50,7 @@ function getGitHubDefaultBranch(url) {
 function downloadGitHubFile(url, file) {
     console.log(`Downloading file from ${url} to ${file}`)
     try {
-        const branch = execSync(`curl -L --fail --no-progress-meter --connect-timeout 10 -o ${file} ${url}`);
+        execSync(`curl -L --fail --no-progress-meter --connect-timeout 10 -o ${file} ${url}`);
         return true;
     } catch (e) {
         console.log(e.message);
@@ -98,7 +98,7 @@ for (const module in licenses) {
     }
     console.log(`${module}: ${licenses[module].licenses}`);
 
-    let repository = licenses[module].repository;
+    const repository = licenses[module].repository;
     let license = licenses[module].licenses;
 
     // manual license fix until corrected in package.json

@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="driver.js" type="NodeJSConfigurationType" nameIsGenerated="true" path-to-js-file="driver.js" working-dir="$PROJECT_DIR$">
+    <envs>
+      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
+      <env name="UC_INTEGRATION_HTTP_PORT" value="8098" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>
