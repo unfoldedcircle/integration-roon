@@ -16,17 +16,17 @@
     "node-roon-api-status": "github:roonlabs/node-roon-api-status#504c918d6da267e03fbb4337befa71ca3d3c7526",
     "node-roon-api-transport": "github:roonlabs/node-roon-api-transport#2ee60008a4cdb90c34ff3de58bb4b949067f1d20",
     "uc-integration-api": "git+https://github.com/unfoldedcircle/integration-node-library.git#18e552698c14eca05347f0e666ff11dc56b94e1e",
-    "ws": "^8.15.1"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
-    "eslint": "^8.35.0",
-    "eslint-config-prettier": "8.8.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.27.5",
     "eslint-plugin-n": "^15.6.1",
-    "eslint-plugin-prettier": "4.2.1",
-    "eslint-plugin-promise": "^6.1.1",
-    "prettier": "^2.8.8",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-promise": "^6.6.0",
+    "prettier": "^3.3.3",
     "semistandard": "^17.0.0"
   }
 }
