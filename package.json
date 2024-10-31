@@ -5,6 +5,7 @@
   "main": "driver.js",
   "scripts": {
     "format": "prettier --write .",
+    "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
