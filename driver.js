@@ -1,13 +1,14 @@
 "use strict";
 
-const uc = require("uc-integration-api");
-uc.init("driver.json");
+import * as uc from "@unfoldedcircle/integration-api";
+import RoonApi from "node-roon-api";
+import RoonApiStatus from "node-roon-api-status";
+import RoonApiTransport from "node-roon-api-transport";
+import RoonApiImage from "node-roon-api-image";
+import fs from "fs";
 
-const RoonApi = require("node-roon-api");
-const RoonApiStatus = require("node-roon-api-status");
-const RoonApiTransport = require("node-roon-api-transport");
-const RoonApiImage = require("node-roon-api-image");
-const fs = require("fs");
+const driver = new uc.IntegrationAPI();
+driver.init("driver.json");
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -18,121 +19,159 @@ const RoonZones = {};
 let RoonPaired = false;
 let RoonImage = null;
 
-uc.on(uc.EVENTS.ENTITY_COMMAND, async (wsHandle, entityId, entityType, cmdId, params) => {
-  console.log(`[uc_roon] ENTITY COMMAND: ${wsHandle} ${entityId} ${entityType} ${cmdId}`);
+async function handleEntityCommand(entity, cmdId, params) {
+  // console.log(`[uc_roon] ENTITY COMMAND: ${JSON.stringify(entity, null, 2)} ${cmdId}`);
+  console.log("--------------------------------");
+  console.log("find", driver.getConfiguredEntities().getEntity(entity.id));
+  console.log("--------------------------------");
+  console.log("entity", entity);
+  console.log("--------------------------------");
 
   if (!RoonPaired) {
     console.error(`[uc_roon] Roon is not paired. Not executing command ${cmdId}`);
   }
 
-  const entity = uc.configuredEntities.getEntity(entityId);
-  if (entity == null) {
-    console.warn(`[uc_roon] Entity ${entityId} is not configured: cannot execute command ${cmdId}`);
-    await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
-    return;
-  }
-
   switch (cmdId) {
-    case uc.Entities.MediaPlayer.COMMANDS.PLAY_PAUSE:
-      if (entity.attributes.state === uc.Entities.MediaPlayer.STATES.PLAYING) {
-        RoonTransport.control(entityId, "pause", async (error) => {
-          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.PlayPause:
+      if (entity.attributes.state === uc.MediaPlayerStates.Playing) {
+        RoonTransport.control(entity.id, "pause", async (error) => {
+          if (error) {
+            console.error(`[uc_roon] Error pausing media player: ${error}`);
+            return uc.StatusCodes.ServerError;
+          }
+          return uc.StatusCodes.Ok;
         });
       } else {
-        RoonTransport.control(entityId, "play", async (error) => {
-          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+        RoonTransport.control(entity.id, "play", async (error) => {
+          if (error) {
+            console.error(`[uc_roon] Error playing media player: ${error}`);
+            return uc.StatusCodes.ServerError;
+          }
+          return uc.StatusCodes.Ok;
         });
       }
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.NEXT:
-      RoonTransport.control(entityId, "next", async (error) => {
-        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.Next:
+      RoonTransport.control(entity.id, "next", async (error) => {
+        if (error) {
+          console.error(`[uc_roon] Error next media player: ${error}`);
+          return uc.StatusCodes.ServerError;
+        }
+        return uc.StatusCodes.Ok;
       });
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.PREVIOUS:
-      RoonTransport.control(entityId, "previous", async (error) => {
-        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.Previous:
+      RoonTransport.control(entity.id, "previous", async (error) => {
+        if (error) {
+          console.error(`[uc_roon] Error previous media player: ${error}`);
+          return uc.StatusCodes.ServerError;
+        }
+        return uc.StatusCodes.Ok;
       });
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.VOLUME:
-      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+    case uc.MediaPlayerCommands.Volume:
+      if (RoonZones[entity.id] && RoonZones[entity.id].outputs && RoonZones[entity.id].outputs[0]) {
         RoonTransport.change_volume(
-          RoonZones[entityId].outputs[0].output_id,
+          RoonZones[entity.id].outputs[0].output_id,
           "absolute",
           params.volume,
           async (error) => {
-            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+            if (error) {
+              console.error(`[uc_roon] Error changing volume media player: ${error}`);
+              return uc.StatusCodes.ServerError;
+            }
+            return uc.StatusCodes.Ok;
           }
         );
       } else {
-        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+        return uc.StatusCodes.ServiceUnavailable;
       }
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.VOLUME_UP:
-      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
-        RoonTransport.change_volume(RoonZones[entityId].outputs[0].output_id, "relative_step", 1, async (error) => {
-          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.VolumeUp:
+      if (RoonZones[entity.id] && RoonZones[entity.id].outputs && RoonZones[entity.id].outputs[0]) {
+        RoonTransport.change_volume(RoonZones[entity.id].outputs[0].output_id, "relative_step", 1, async (error) => {
+          if (error) {
+            console.error(`[uc_roon] Error changing volume media player: ${error}`);
+            return uc.StatusCodes.ServerError;
+          }
+          return uc.StatusCodes.Ok;
         });
       } else {
-        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+        return uc.StatusCodes.ServiceUnavailable;
       }
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.VOLUME_DOWN:
-      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
-        RoonTransport.change_volume(RoonZones[entityId].outputs[0].output_id, "relative_step", -1, async (error) => {
-          await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.VolumeDown:
+      if (RoonZones[entity.id] && RoonZones[entity.id].outputs && RoonZones[entity.id].outputs[0]) {
+        RoonTransport.change_volume(RoonZones[entity.id].outputs[0].output_id, "relative_step", -1, async (error) => {
+          if (error) {
+            console.error(`[uc_roon] Error changing volume media player: ${error}`);
+            return uc.StatusCodes.ServerError;
+          }
+          return uc.StatusCodes.Ok;
         });
       } else {
-        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+        return uc.StatusCodes.ServiceUnavailable;
       }
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.MUTE_TOGGLE:
-      if (RoonZones[entityId] && RoonZones[entityId].outputs && RoonZones[entityId].outputs[0]) {
+    case uc.MediaPlayerCommands.MuteToggle:
+      if (RoonZones[entity.id] && RoonZones[entity.id].outputs && RoonZones[entity.id].outputs[0]) {
         if (entity.attributes.muted) {
-          RoonTransport.mute(RoonZones[entityId].outputs[0].output_id, "unmute", async (error) => {
-            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+          RoonTransport.mute(RoonZones[entity.id].outputs[0].output_id, "unmute", async (error) => {
+            if (error) {
+              console.error(`[uc_roon] Error unmuting media player: ${error}`);
+              return uc.StatusCodes.ServerError;
+            }
+            return uc.StatusCodes.Ok;
           });
         } else {
-          RoonTransport.mute(RoonZones[entityId].outputs[0].output_id, "mute", async (error) => {
-            await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+          RoonTransport.mute(RoonZones[entity.id].outputs[0].output_id, "mute", async (error) => {
+            if (error) {
+              console.error(`[uc_roon] Error muting media player: ${error}`);
+              return uc.StatusCodes.ServerError;
+            }
+            return uc.StatusCodes.Ok;
           });
         }
       } else {
-        await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.SERVICE_UNAVAILABLE);
+        return uc.StatusCodes.ServiceUnavailable;
       }
       break;
 
-    case uc.Entities.MediaPlayer.COMMANDS.SEEK:
-      RoonTransport.seek(entityId, "absolute", params.media_position, async (error) => {
-        await uc.acknowledgeCommand(wsHandle, !error ? uc.STATUS_CODES.OK : uc.STATUS_CODES.SERVER_ERROR);
+    case uc.MediaPlayerCommands.Seek:
+      RoonTransport.seek(entity.id, "absolute", params.media_position, async (error) => {
+        if (error) {
+          console.error(`[uc_roon] Error seeking media player: ${error}`);
+          return uc.StatusCodes.ServerError;
+        }
+        return uc.StatusCodes.Ok;
       });
       break;
 
     default:
       console.warn(`[uc_roon] Unknown entity command: ${cmdId}`);
-      await uc.acknowledgeCommand(wsHandle, uc.STATUS_CODES.BAD_REQUEST);
-      break;
+      return uc.StatusCodes.BadRequest;
   }
-});
+}
 
-uc.on(uc.EVENTS.CONNECT, async () => {
+driver.on(uc.Events.Connect, async () => {
   roonExtentionStatus.set_status("Connected", false);
   try {
     await getRoonZones();
-    await uc.setDeviceState(uc.DEVICE_STATES.CONNECTED);
+    await driver.setDeviceState(uc.DeviceStates.Connected);
   } catch (e) {
     console.log(`[uc_roon] Failed to get Roon zones: ${e}`);
-    await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+    await driver.setDeviceState(uc.DeviceStates.Disconnected);
   }
 });
 
-uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entityIds) => {
+driver.on(uc.Events.SubscribeEntities, async (entityIds) => {
+  console.log(`[uc_roon] Subscribing to entities: ${entityIds}`);
   if (RoonCore == null) {
     console.log("[uc_roon] Can't send entity data after subscribe: Roon core not available");
     return;
@@ -141,7 +180,7 @@ uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entityIds) => {
   const roonTransport = RoonCore.services.RoonApiTransport;
 
   entityIds.forEach((entityId) => {
-    const entity = uc.configuredEntities.getEntity(entityId);
+    const entity = driver.getConfiguredEntities().getEntity(entityId);
     if (entity) {
       console.log(`[uc_roon] Subscribe: ${entityId}`);
 
@@ -150,38 +189,39 @@ uc.on(uc.EVENTS.SUBSCRIBE_ENTITIES, async (entityIds) => {
       if (zone) {
         console.log(`[uc_roon] Zone data: ${JSON.stringify(zone)}`);
         const attr = mediaPlayerAttributesFromZone(zone);
-        uc.configuredEntities.updateEntityAttributes(entityId, attr);
+        console.log(`[uc_roon] Attributes: ${entityId} ${JSON.stringify(attr)}`);
+        driver.getConfiguredEntities().updateEntityAttributes(entityId, attr);
       } else {
         // Send entity change with last known information to update UI
-        uc.emit(uc.EVENTS.ENTITY_ATTRIBUTES_UPDATED, entity.id, entity.entity_type, entity.attributes);
+        driver.emit(uc.Events.EntityAttributesUpdated, entity.id, entity.entity_type, entity.attributes);
       }
     }
   });
 });
 
-uc.on(uc.EVENTS.DISCONNECT, async () => {
+driver.on(uc.Events.Disconnect, async () => {
   roonExtentionStatus.set_status("Disconnected", false);
   // TODO unsubscribe from Roon?
-  await uc.setDeviceState(uc.DEVICE_STATES.DISCONNECTED);
+  await driver.setDeviceState(uc.DeviceStates.Disconnected);
 });
 
-uc.on(uc.EVENTS.ENTER_STANDBY, async () => {
+driver.on(uc.Events.EnterStandby, async () => {
   roonExtentionStatus.set_status("Disconnected", false);
 });
 
-uc.on(uc.EVENTS.EXIT_STANDBY, async () => {
+driver.on(uc.Events.ExitStandby, async () => {
   roonExtentionStatus.set_status("Connected", false);
 });
 
 // DRIVER SETUP
-uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
+driver.on(uc.Events.SetupDriver, async (wsHandle, setupData) => {
   console.log(`[uc_roon] Setting up driver. Setup data: ${setupData}`);
 
-  await uc.acknowledgeCommand(wsHandle);
+  await driver.acknowledgeCommand(wsHandle);
   console.log("[uc_roon] Acknowledged driver setup");
 
   const img = convertImageToBase64("./assets/setupimg.png");
-  await uc.requestDriverSetupUserConfirmation(
+  await driver.requestDriverSetupUserConfirmation(
     wsHandle,
     "User action needed",
     "Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.",
@@ -189,12 +229,12 @@ uc.on(uc.EVENTS.SETUP_DRIVER, async (wsHandle, setupData) => {
   );
 });
 
-uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
+driver.on(uc.Events.SetupDriverUserConfirmation, async (wsHandle) => {
   console.log("[uc_roon] Received user confirmation for driver setup: sending OK");
-  await uc.acknowledgeCommand(wsHandle);
+  await driver.acknowledgeCommand(wsHandle);
 
   // Update setup progress
-  await uc.driverSetupProgress(wsHandle);
+  await driver.driverSetupProgress(wsHandle);
   console.log("[uc_roon] Sending setup progress that we are still busy...");
 
   await delay(3000);
@@ -202,9 +242,9 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
   if (RoonPaired) {
     console.log("[uc_roon] Driver setup completed!");
     await getRoonZones();
-    await uc.driverSetupComplete(wsHandle);
+    await driver.driverSetupComplete(wsHandle);
   } else {
-    await uc.driverSetupError(wsHandle, "Failed to pair with Roon.");
+    await driver.driverSetupError(wsHandle, "Failed to pair with Roon.");
     console.error("[uc_roon] Failed to pair with Roon");
   }
 });
@@ -215,7 +255,7 @@ uc.on(uc.EVENTS.SETUP_DRIVER_USER_CONFIRMATION, async (wsHandle) => {
 const roon = new RoonApi({
   extension_id: "com.uc.remote",
   display_name: "Unfolded Circle Roon Integration",
-  display_version: uc.getDriverVersion().version.driver,
+  display_version: driver.getDriverVersion().version.driver,
   publisher: "Unfolded Circle",
   email: "support@unfoldedcircle.com",
   website: "https://unfoldedcircle.com",
@@ -237,13 +277,13 @@ const roon = new RoonApi({
 
     console.log(`[uc_roon] Roon Core unpaired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
-    const entities = uc.configuredEntities.getEntities();
+    const entities = driver.configuredEntities.getEntities();
 
     for (const entity of entities) {
       if (entity.entity_id) {
         const attr = new Map([]);
-        attr.set([uc.Entities.Light.ATTRIBUTES.STATE], uc.Entities.Light.STATES.UNAVAILABLE);
-        uc.configuredEntities.updateEntityAttributes(entity.entity_id, attr);
+        attr.set([uc.MediaPlayerAttributes.State], uc.MediaPlayerStates.Unavailable);
+        driver.configuredEntities.updateEntityAttributes(entity.entity_id, attr);
       }
     }
 
@@ -254,64 +294,63 @@ const roon = new RoonApi({
 const roonExtentionStatus = new RoonApiStatus(roon);
 
 async function getRoonZones() {
-  if (RoonCore != null) {
-    console.log("[uc_roon] Getting Roon Zones");
-    RoonTransport = RoonCore.services.RoonApiTransport;
-
-    RoonTransport.get_zones(async (error, data) => {
-      if (error) {
-        console.log("[uc_roon] Failed to get Roon Zones");
-        return;
-      }
-
-      for (const zone of data.zones) {
-        console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
-        RoonZones[zone.zone_id] = {
-          outputs: zone.outputs
-        };
-
-        const res = uc.availableEntities.contains(zone.zone_id);
-        if (!res) {
-          // TODO add & test REPEAT, SHUFFLE
-          const features = [
-            uc.Entities.MediaPlayer.FEATURES.ON_OFF,
-            uc.Entities.MediaPlayer.FEATURES.MUTE_TOGGLE,
-            uc.Entities.MediaPlayer.FEATURES.PLAY_PAUSE,
-            uc.Entities.MediaPlayer.FEATURES.NEXT,
-            uc.Entities.MediaPlayer.FEATURES.PREVIOUS,
-            uc.Entities.MediaPlayer.FEATURES.SEEK,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_DURATION,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_POSITION,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_TITLE,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_ARTIST,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_ALBUM,
-            uc.Entities.MediaPlayer.FEATURES.MEDIA_IMAGE_URL
-          ];
-
-          if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-            // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
-            features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME);
-            features.push(uc.Entities.MediaPlayer.FEATURES.VOLUME_UP_DOWN);
-          }
-
-          const attributes = mediaPlayerAttributesFromZone(zone);
-
-          const entity = new uc.Entities.MediaPlayer(
-            zone.zone_id,
-            new Map([["en", zone.display_name]]),
-            features,
-            attributes
-          );
-
-          uc.availableEntities.addEntity(entity);
-        }
-      }
-    });
-  } else {
-    console.log(`[uc_roon] Cannot get Roon zones. RoonCore is null.`);
+  if (RoonCore == null) {
+    console.log("[uc_roon] Cannot get Roon zones. RoonCore is null.");
+    return;
   }
-}
 
+  console.log("[uc_roon] Getting Roon Zones");
+  RoonTransport = RoonCore.services.RoonApiTransport;
+
+  RoonTransport.get_zones(async (error, data) => {
+    if (error) {
+      console.log("[uc_roon] Failed to get Roon Zones");
+      return;
+    }
+
+    for (const zone of data.zones) {
+      console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
+      RoonZones[zone.zone_id] = {
+        outputs: zone.outputs
+      };
+
+      // todo: driver should expose metod to get entity by id
+      const res = driver.getAvailableEntities().contains(zone.zone_id);
+      if (!res) {
+        // TODO add & test REPEAT, SHUFFLE
+        const features = [
+          uc.MediaPlayerFeatures.OnOff,
+          uc.MediaPlayerFeatures.MuteToggle,
+          uc.MediaPlayerFeatures.PlayPause,
+          uc.MediaPlayerFeatures.Next,
+          uc.MediaPlayerFeatures.Previous,
+          uc.MediaPlayerFeatures.Seek,
+          uc.MediaPlayerFeatures.MediaDuration,
+          uc.MediaPlayerFeatures.MediaPosition,
+          uc.MediaPlayerFeatures.MediaTitle,
+          uc.MediaPlayerFeatures.MediaArtist,
+          uc.MediaPlayerFeatures.MediaAlbum,
+          uc.MediaPlayerFeatures.MediaImageUrl
+        ];
+
+        if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+          // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
+          features.push(uc.MediaPlayerFeatures.Volume);
+          features.push(uc.MediaPlayerFeatures.VolumeUpDown);
+        }
+
+        const attributes = mediaPlayerAttributesFromZone(zone);
+
+        const entity = new uc.MediaPlayer(zone.zone_id, new Map([["en", zone.display_name]]), {
+          features,
+          attributes
+        });
+        entity.setCmdHandler(handleEntityCommand);
+        driver.addAvailableEntity(entity);
+      }
+    }
+  });
+}
 async function subscribeRoonZones() {
   // add event listeners to roon
   if (RoonCore != null) {
@@ -326,17 +365,19 @@ async function subscribeRoonZones() {
           });
         } else if (data.zones_seek_changed) {
           data.zones_seek_changed.forEach((zone) => {
-            if (!uc.configuredEntities.contains(zone.zone_id)) {
+            if (!driver.getConfiguredEntities().contains(zone.zone_id)) {
               console.log(
                 `[uc_roon] Configured entity not found, not updating seek: ${zone.display_name} (${zone.zone_id})`
               );
               return;
             }
 
-            uc.configuredEntities.updateEntityAttributes(
-              zone.zone_id,
-              new Map([[uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION, zone.seek_position]])
-            );
+            driver
+              .getConfiguredEntities()
+              .updateEntityAttributes(
+                zone.zone_id,
+                new Map([[uc.MediaPlayerAttributes.MediaPosition, zone.seek_position]])
+              );
           });
         }
       } else if (cmd === "Subscribed") {
@@ -361,7 +402,7 @@ function updateMediaPlayerFromZone(zone) {
     return;
   }
 
-  if (!uc.configuredEntities.contains(zone.zone_id)) {
+  if (!driver.getConfiguredEntities().contains(zone.zone_id)) {
     console.log(`[uc_roon] Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
     return;
   }
@@ -385,19 +426,19 @@ function updateMediaPlayerFromZone(zone) {
           } else if (image) {
             const imageResponse = new Map([]);
             imageResponse.set(
-              [uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL],
+              [uc.MediaPlayerAttributes.MediaImageUrl],
               "data:image/png;base64," + image.toString("base64")
             );
-            uc.configuredEntities.updateEntityAttributes(zone.zone_id, imageResponse);
+            driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, imageResponse);
           }
         }
       );
     } else {
-      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_IMAGE_URL], "");
+      attr.set([uc.MediaPlayerAttributes.MediaImageUrl], "");
     }
   }
 
-  uc.configuredEntities.updateEntityAttributes(zone.zone_id, attr);
+  driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr);
 }
 
 /**
@@ -418,21 +459,21 @@ function mediaPlayerAttributesFromZone(zone) {
   // state
   switch (zone.state) {
     case "playing":
-      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], uc.Entities.MediaPlayer.STATES.PLAYING);
+      attr.set([uc.MediaPlayerAttributes.State], uc.MediaPlayerStates.Playing);
       break;
 
     case "stopped":
     case "paused":
-      attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.STATE], uc.Entities.MediaPlayer.STATES.PAUSED);
+      attr.set([uc.MediaPlayerAttributes.State], uc.MediaPlayerStates.Paused);
       break;
   }
 
   if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
     // volume
-    attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.VOLUME], zone.outputs[0].volume.value);
+    attr.set([uc.MediaPlayerAttributes.Volume], zone.outputs[0].volume.value);
 
     // muted
-    attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MUTED], zone.outputs[0].volume.is_muted);
+    attr.set([uc.MediaPlayerAttributes.Muted], zone.outputs[0].volume.is_muted);
   }
 
   let mediaDuration = 0;
@@ -456,11 +497,11 @@ function mediaPlayerAttributesFromZone(zone) {
     }
   }
 
-  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_TITLE], mediaTitle);
-  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ARTIST], mediaArtist);
-  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_ALBUM], mediaAlbum);
-  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_DURATION], mediaDuration);
-  attr.set([uc.Entities.MediaPlayer.ATTRIBUTES.MEDIA_POSITION], mediaPosition);
+  attr.set([uc.MediaPlayerAttributes.MediaTitle], mediaTitle);
+  attr.set([uc.MediaPlayerAttributes.MediaArtist], mediaArtist);
+  attr.set([uc.MediaPlayerAttributes.MediaAlbum], mediaAlbum);
+  attr.set([uc.MediaPlayerAttributes.MediaDuration], mediaDuration);
+  attr.set([uc.MediaPlayerAttributes.MediaPosition], mediaPosition);
 
   return attr;
 }
@@ -483,9 +524,7 @@ async function init() {
     required_services: [RoonApiTransport, RoonApiImage],
     provided_services: [roonExtentionStatus]
   });
-
   roonExtentionStatus.set_status("Disconnected", false);
-
   roon.start_discovery();
 }
 
