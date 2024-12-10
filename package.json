@@ -1,14 +1,16 @@
 {
-  "type": "module",
   "name": "uc-integration-roon",
+  "type": "module",
   "version": "0.2.5",
   "description": "Roon Integration for the Unfolded Circle",
-  "main": "driver.js",
+  "main": "dist/index.js",
   "scripts": {
     "format": "prettier --write .",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js"
   },
   "author": "Unfolded Circle",
   "license": "MPL-2.0",
@@ -21,6 +23,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.1",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-config-standard": "^17.0.0",
@@ -29,6 +32,7 @@
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-promise": "^6.6.0",
     "prettier": "^3.3.3",
-    "semistandard": "^17.0.0"
+    "semistandard": "^17.0.0",
+    "typescript": "^5.7.2"
   }
 }
