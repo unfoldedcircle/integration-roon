@@ -106,3 +106,5 @@ dist
 config.json
 configured.json
 config.json
+
+*.http
