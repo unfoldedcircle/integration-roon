@@ -343,8 +343,7 @@ export default class RoonDriver {
     return new Promise((resolve) => {
       switch (command) {
         case uc.MediaPlayerCommands.PlayPause: {
-          const entityState = this.driver.getConfiguredEntities().getEntity(entity.id);
-          if (entityState?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing) {
+          if (entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing) {
             this.roonTransport.control(entity.id, "pause", async (error) => {
               if (error) {
                 console.error(`[uc_roon] Error pausing media player: ${error}`);
@@ -432,7 +431,7 @@ export default class RoonDriver {
         case uc.MediaPlayerCommands.MuteToggle: {
           const output = this.getDefaultZoneOutput(entity.id);
           if (output) {
-            if (entity.attributes?.muted) {
+            if (entity.attributes?.[uc.MediaPlayerAttributes.Muted]) {
               this.roonTransport.mute(output.output_id, "unmute", async (error) => {
                 if (error) {
                   console.error(`[uc_roon] Error unmuting media player: ${error}`);
