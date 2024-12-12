@@ -16,7 +16,7 @@ export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
 };
 
 export const mediaPlayerAttributesFromZone = (zone: Zone) => {
-  const attr = new Map([]);
+  const attr: { [key: string]: string | number | boolean } = {};
 
   if (!zone) {
     return attr;
@@ -25,21 +25,21 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   // state
   switch (zone.state) {
     case "playing":
-      attr.set([uc.MediaPlayerAttributes.State], uc.MediaPlayerStates.Playing);
+      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Playing;
       break;
 
     case "stopped":
     case "paused":
-      attr.set([uc.MediaPlayerAttributes.State], uc.MediaPlayerStates.Paused);
+      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Paused;
       break;
   }
 
   if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
     // volume
-    attr.set([uc.MediaPlayerAttributes.Volume], zone.outputs[0].volume.value);
+    attr[uc.MediaPlayerAttributes.Volume] = zone.outputs[0].volume.value ?? 0;
 
     // muted
-    attr.set([uc.MediaPlayerAttributes.Muted], zone.outputs[0].volume.is_muted);
+    attr[uc.MediaPlayerAttributes.Muted] = zone.outputs[0].volume.is_muted ?? false;
   }
 
   let mediaDuration = 0;
@@ -63,11 +63,11 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
     }
   }
 
-  attr.set([uc.MediaPlayerAttributes.MediaTitle], mediaTitle);
-  attr.set([uc.MediaPlayerAttributes.MediaArtist], mediaArtist);
-  attr.set([uc.MediaPlayerAttributes.MediaAlbum], mediaAlbum);
-  attr.set([uc.MediaPlayerAttributes.MediaDuration], mediaDuration);
-  attr.set([uc.MediaPlayerAttributes.MediaPosition], mediaPosition);
+  attr[uc.MediaPlayerAttributes.MediaTitle] = mediaTitle;
+  attr[uc.MediaPlayerAttributes.MediaArtist] = mediaArtist;
+  attr[uc.MediaPlayerAttributes.MediaAlbum] = mediaAlbum;
+  attr[uc.MediaPlayerAttributes.MediaDuration] = mediaDuration;
+  attr[uc.MediaPlayerAttributes.MediaPosition] = mediaPosition;
 
   return attr;
 };
