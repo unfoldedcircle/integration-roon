@@ -343,19 +343,11 @@ export default class RoonDriver {
     return new Promise((resolve) => {
       switch (command) {
         case uc.MediaPlayerCommands.PlayPause: {
-          if (entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing) {
-            this.roonTransport.control(entity.id, "pause", async (error) => {
-              if (error) {
-                console.error(`[uc_roon] Error pausing media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          }
-          this.roonTransport.control(entity.id, "play", async (error) => {
+          const roonCmd =
+            entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
+          this.roonTransport.control(entity.id, roonCmd, async (error) => {
             if (error) {
-              console.error(`[uc_roon] Error playing media player: ${error}`);
+              console.error(`[uc_roon] Error ${roonCmd}ing media player: ${error}`);
               resolve(uc.StatusCodes.ServerError);
             } else {
               resolve(uc.StatusCodes.Ok);
@@ -431,25 +423,15 @@ export default class RoonDriver {
         case uc.MediaPlayerCommands.MuteToggle: {
           const output = this.getDefaultZoneOutput(entity.id);
           if (output) {
-            if (entity.attributes?.[uc.MediaPlayerAttributes.Muted]) {
-              this.roonTransport.mute(output.output_id, "unmute", async (error) => {
-                if (error) {
-                  console.error(`[uc_roon] Error unmuting media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              });
-            } else {
-              this.roonTransport.mute(output.output_id, "mute", async (error) => {
-                if (error) {
-                  console.error(`[uc_roon] Error muting media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              });
-            }
+            const roonCmd = entity.attributes?.[uc.MediaPlayerAttributes.Muted] ? "unmute" : "mute";
+            this.roonTransport.mute(output.output_id, roonCmd, async (error) => {
+              if (error) {
+                console.error(`[uc_roon] Error on ${roonCmd} media player: ${error}`);
+                resolve(uc.StatusCodes.ServerError);
+              } else {
+                resolve(uc.StatusCodes.Ok);
+              }
+            });
           }
           break;
         }
