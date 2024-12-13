@@ -347,7 +347,7 @@ export default class RoonDriver {
             entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
           this.roonTransport.control(entity.id, roonCmd, async (error) => {
             if (error) {
-              console.error(`[uc_roon] Error ${roonCmd}ing media player: ${error}`);
+              console.error(`[uc_roon] Error on ${roonCmd} media player: ${error}`);
               resolve(uc.StatusCodes.ServerError);
             } else {
               resolve(uc.StatusCodes.Ok);
