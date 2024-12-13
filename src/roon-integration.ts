@@ -77,33 +77,13 @@ export default class RoonDriver {
           console.log(`[uc_roon] Zone data: ${JSON.stringify(zone)}`);
           const attr = mediaPlayerAttributesFromZone(zone);
           console.log(`[uc_roon] Attributes: ${entityId} ${JSON.stringify(attr)}`);
-          this.driver.getConfiguredEntities().updateEntityAttributes(entityId, attr as any);
+          this.driver.getConfiguredEntities().updateEntityAttributes(entityId, attr);
         } else {
           // Send entity change with last known information to update UI
           this.driver.emit(uc.Events.EntityAttributesUpdated, entity.id, entity.entity_type, entity.attributes);
         }
       }
     });
-  }
-
-  private async handleSetupDriverUserConfirmation(wsHandle: uc.WsHandle) {
-    console.log("[uc_roon] Received user confirmation for driver setup: sending OK");
-    await this.driver.acknowledgeCommand(wsHandle);
-
-    // Update setup progress
-    await this.driver.driverSetupProgress(wsHandle);
-    console.log("[uc_roon] Sending setup progress that we are still busy...");
-
-    await delay(3000);
-
-    if (this.roonPaired) {
-      console.log("[uc_roon] Driver setup completed!");
-      await this.getRoonZones();
-      await this.driver.driverSetupComplete(wsHandle);
-    } else {
-      await this.driver.driverSetupError(wsHandle, "Failed to pair with Roon.");
-      console.error("[uc_roon] Failed to pair with Roon");
-    }
   }
 
   private async handleDisconnect() {
@@ -135,6 +115,26 @@ export default class RoonDriver {
       "Please open Roon, navigate to *Settings/Extensions* and click *Enable* next to the Unfolded Circle Roon Integration.\n\nThen click Next.",
       img
     );
+  }
+
+  private async handleSetupDriverUserConfirmation(wsHandle: uc.WsHandle) {
+    console.log("[uc_roon] Received user confirmation for driver setup: sending OK");
+    await this.driver.acknowledgeCommand(wsHandle);
+
+    // Update setup progress
+    await this.driver.driverSetupProgress(wsHandle);
+    console.log("[uc_roon] Sending setup progress that we are still busy...");
+
+    await delay(3000);
+
+    if (this.roonPaired) {
+      console.log("[uc_roon] Driver setup completed!");
+      await this.getRoonZones();
+      await this.driver.driverSetupComplete(wsHandle);
+    } else {
+      await this.driver.driverSetupError(wsHandle, "Failed to pair with Roon.");
+      console.error("[uc_roon] Failed to pair with Roon");
+    }
   }
 
   private async subscribeRoonZones() {
@@ -231,11 +231,11 @@ export default class RoonDriver {
           }
         );
       } else {
-        attr.set([uc.MediaPlayerAttributes.MediaImageUrl], "");
+        attr[uc.MediaPlayerAttributes.MediaImageUrl] = "";
       }
     }
 
-    this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr as any);
+    this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr);
   }
 
   private async handleRoonCorePaired(core: Core) {
@@ -258,7 +258,7 @@ export default class RoonDriver {
     this.roonImage = null;
   }
 
-  private async getRoonZones() {
+  private async getRoonZones(): Promise<void> {
     if (this.roonCore == null) {
       console.log("[uc_roon] Cannot get Roon zones. RoonCore is null.");
       return;
@@ -269,55 +269,57 @@ export default class RoonDriver {
       return;
     }
 
-    console.log("[uc_roon] Getting Roon Zones");
-
-    this.roonTransport.get_zones(async (error, data) => {
-      if (error) {
-        console.log("[uc_roon] Failed to get Roon Zones");
-        return;
-      }
-
-      for (const zone of data.zones) {
-        console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
-        this.roonZones[zone.zone_id] = {
-          outputs: zone.outputs
-        };
-
-        // todo: driver should expose metod to get entity by id
-        const res = this.driver.getAvailableEntities().getEntity(zone.zone_id);
-        if (!res) {
-          // TODO add & test REPEAT, SHUFFLE
-          const features = [
-            uc.MediaPlayerFeatures.OnOff,
-            uc.MediaPlayerFeatures.MuteToggle,
-            uc.MediaPlayerFeatures.PlayPause,
-            uc.MediaPlayerFeatures.Next,
-            uc.MediaPlayerFeatures.Previous,
-            uc.MediaPlayerFeatures.Seek,
-            uc.MediaPlayerFeatures.MediaDuration,
-            uc.MediaPlayerFeatures.MediaPosition,
-            uc.MediaPlayerFeatures.MediaTitle,
-            uc.MediaPlayerFeatures.MediaArtist,
-            uc.MediaPlayerFeatures.MediaAlbum,
-            uc.MediaPlayerFeatures.MediaImageUrl
-          ];
-
-          if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-            // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
-            features.push(uc.MediaPlayerFeatures.Volume);
-            features.push(uc.MediaPlayerFeatures.VolumeUpDown);
-          }
-
-          const attributes = mediaPlayerAttributesFromZone(zone);
-
-          const entity = new uc.MediaPlayer(zone.zone_id, new Map([["en", zone.display_name]]) as any, {
-            features,
-            attributes: attributes as any
-          });
-          entity.setCmdHandler(this.handleEntityCommand.bind(this));
-          this.driver.addAvailableEntity(entity);
+    return new Promise((resolve, reject) => {
+      this.roonTransport.get_zones(async (error, data) => {
+        if (error) {
+          console.log("[uc_roon] Failed to get Roon Zones");
+          reject(error);
         }
-      }
+
+        for (const zone of data.zones) {
+          console.log(`[uc_roon] Found zone: ${zone.display_name} (${zone.zone_id})`);
+          this.roonZones[zone.zone_id] = {
+            outputs: zone.outputs
+          };
+
+          // todo: driver should expose metod to get entity by id
+          const res = this.driver.getAvailableEntities().getEntity(zone.zone_id);
+          if (!res) {
+            // TODO add & test REPEAT, SHUFFLE
+            const features = [
+              uc.MediaPlayerFeatures.OnOff,
+              uc.MediaPlayerFeatures.MuteToggle,
+              uc.MediaPlayerFeatures.PlayPause,
+              uc.MediaPlayerFeatures.Next,
+              uc.MediaPlayerFeatures.Previous,
+              uc.MediaPlayerFeatures.Seek,
+              uc.MediaPlayerFeatures.MediaDuration,
+              uc.MediaPlayerFeatures.MediaPosition,
+              uc.MediaPlayerFeatures.MediaTitle,
+              uc.MediaPlayerFeatures.MediaArtist,
+              uc.MediaPlayerFeatures.MediaAlbum,
+              uc.MediaPlayerFeatures.MediaImageUrl
+            ];
+
+            if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+              // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
+              features.push(uc.MediaPlayerFeatures.Volume);
+              features.push(uc.MediaPlayerFeatures.VolumeUpDown);
+            }
+
+            const attributes = mediaPlayerAttributesFromZone(zone);
+
+            const entity = new uc.MediaPlayer(zone.zone_id, new Map([["en", zone.display_name]]) as any, {
+              features,
+              attributes
+            });
+
+            entity.setCmdHandler(this.handleEntityCommand.bind(this));
+            this.driver.addAvailableEntity(entity);
+          }
+        }
+        resolve();
+      });
     });
   }
 
@@ -341,20 +343,11 @@ export default class RoonDriver {
     return new Promise((resolve) => {
       switch (command) {
         case uc.MediaPlayerCommands.PlayPause: {
-          const entityState = this.driver.getConfiguredEntities().getEntity(entity.id);
-          if (entityState?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing) {
-            this.roonTransport.control(entity.id, "pause", async (error) => {
-              if (error) {
-                console.error(`[uc_roon] Error pausing media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          }
-          this.roonTransport.control(entity.id, "play", async (error) => {
+          const roonCmd =
+            entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
+          this.roonTransport.control(entity.id, roonCmd, async (error) => {
             if (error) {
-              console.error(`[uc_roon] Error playing media player: ${error}`);
+              console.error(`[uc_roon] Error on ${roonCmd} media player: ${error}`);
               resolve(uc.StatusCodes.ServerError);
             } else {
               resolve(uc.StatusCodes.Ok);
@@ -430,25 +423,15 @@ export default class RoonDriver {
         case uc.MediaPlayerCommands.MuteToggle: {
           const output = this.getDefaultZoneOutput(entity.id);
           if (output) {
-            if (entity.attributes?.muted) {
-              this.roonTransport.mute(output.output_id, "unmute", async (error) => {
-                if (error) {
-                  console.error(`[uc_roon] Error unmuting media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              });
-            } else {
-              this.roonTransport.mute(output.output_id, "mute", async (error) => {
-                if (error) {
-                  console.error(`[uc_roon] Error muting media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              });
-            }
+            const roonCmd = entity.attributes?.[uc.MediaPlayerAttributes.Muted] ? "unmute" : "mute";
+            this.roonTransport.mute(output.output_id, roonCmd, async (error) => {
+              if (error) {
+                console.error(`[uc_roon] Error on ${roonCmd} media player: ${error}`);
+                resolve(uc.StatusCodes.ServerError);
+              } else {
+                resolve(uc.StatusCodes.Ok);
+              }
+            });
           }
           break;
         }
