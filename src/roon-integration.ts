@@ -273,7 +273,7 @@ export default class RoonDriver {
           reject(error);
         }
 
-        // clear config every time we fetch zones 
+        // clear config every time we fetch zones
         // so we can keep track of available zones
         this.config.clear();
         for (const zone of data.zones) {
