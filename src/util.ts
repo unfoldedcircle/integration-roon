@@ -71,3 +71,39 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
 
   return attr;
 };
+
+export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) {
+  const features = [
+    uc.MediaPlayerFeatures.OnOff,
+    uc.MediaPlayerFeatures.MuteToggle,
+    uc.MediaPlayerFeatures.PlayPause,
+    uc.MediaPlayerFeatures.Next,
+    uc.MediaPlayerFeatures.Previous,
+    uc.MediaPlayerFeatures.Seek,
+    uc.MediaPlayerFeatures.MediaDuration,
+    uc.MediaPlayerFeatures.MediaPosition,
+    uc.MediaPlayerFeatures.MediaTitle,
+    uc.MediaPlayerFeatures.MediaArtist,
+    uc.MediaPlayerFeatures.MediaAlbum,
+    uc.MediaPlayerFeatures.MediaImageUrl
+  ];
+
+  // TODO add & test REPEAT, SHUFFLE
+  if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+    // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
+    features.push(uc.MediaPlayerFeatures.Volume);
+    features.push(uc.MediaPlayerFeatures.VolumeUpDown);
+  }
+
+  const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
+  const entity = new uc.MediaPlayer(
+    zone.zone_id,
+    { en: zone.display_name },
+    {
+      features,
+      attributes
+    }
+  );
+
+  return entity;
+}
