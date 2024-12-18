@@ -16,7 +16,7 @@
   "license": "MPL-2.0",
   "dependencies": {
     "@unfoldedcircle/integration-api": "^0.2.0",
-    "node-roon-api": "github:roonlabs/node-roon-api#7cfaddc63b0d8a8bffe0f71df02d7c73adc728a5",
+    "node-roon-api": "https://github.com/unfoldedcircle/node-roon-api.git",
     "node-roon-api-image": "github:roonlabs/node-roon-api-image#a5f0efaf2dfb5457e91abe326c3a40d865131d32",
     "node-roon-api-status": "github:roonlabs/node-roon-api-status#504c918d6da267e03fbb4337befa71ca3d3c7526",
     "node-roon-api-transport": "github:roonlabs/node-roon-api-transport#2ee60008a4cdb90c34ff3de58bb4b949067f1d20",

@@ -193,6 +193,8 @@ declare module "node-roon-api" {
     website?: string;
     /** Determines the level of logging: "all", "none", or other values for selective logging. */
     log_level: string;
+    /** (Optional) Directory to store configuration files. */
+    configDir?: string;
     /** (Optional) Callback invoked when Roon pairs your extension with a Core. */
     core_paired?: (core: Core) => void;
     /** (Optional) Callback invoked when Roon unpairs your extension from a Core. */

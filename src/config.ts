@@ -1,12 +1,15 @@
 import fs from "fs";
 import { Zone } from "node-roon-api";
+import path from "path";
 
 const CFG_FILENAME = "roon_config.json";
 
 class Config {
   private zones: { [key: string]: Zone } = {};
+  private configPath: string;
 
-  constructor() {
+  constructor(configDir: string) {
+    this.configPath = path.join(configDir, CFG_FILENAME);
     this.loadFromFile();
   }
 
@@ -35,8 +38,8 @@ class Config {
   }
 
   private loadFromFile() {
-    if (fs.existsSync(CFG_FILENAME)) {
-      const data = fs.readFileSync(CFG_FILENAME, "utf-8");
+    if (fs.existsSync(this.configPath)) {
+      const data = fs.readFileSync(this.configPath, "utf-8");
       this.zones = JSON.parse(data);
     } else {
       this.saveToFile();
@@ -45,7 +48,7 @@ class Config {
 
   private saveToFile() {
     const data = JSON.stringify(this.zones, null, 2);
-    fs.writeFileSync(CFG_FILENAME, data, "utf-8");
+    fs.writeFileSync(this.configPath, data, "utf-8");
   }
 }
 

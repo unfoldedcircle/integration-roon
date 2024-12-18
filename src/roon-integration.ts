@@ -20,7 +20,7 @@ export default class RoonDriver {
   constructor() {
     this.driver = new uc.IntegrationAPI();
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-    this.config = new Config();
+    this.config = new Config(this.driver.getConfigDirPath());
     this.initLocalZones();
     this.roon = new RoonApi({
       extension_id: "com.uc.remote",
@@ -31,7 +31,8 @@ export default class RoonDriver {
       website: "https://unfoldedcircle.com",
       log_level: "none",
       core_paired: this.handleRoonCorePaired.bind(this),
-      core_unpaired: this.handleRoonCoreUnpaired.bind(this)
+      core_unpaired: this.handleRoonCoreUnpaired.bind(this),
+      configDir: this.driver.getConfigDirPath()
     });
 
     this.roonApiStatus = new RoonApiStatus(this.roon);
