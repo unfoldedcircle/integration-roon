@@ -1,3 +1,10 @@
+/**
+ * Utility functions of the Roon integration driver for Remote Two/3.
+ *
+ * @copyright (c) 2024 by Unfolded Circle ApS.
+ * @license Mozilla Public License Version 2.0, see LICENSE for more details.
+ */
+
 import fs from "fs";
 import * as uc from "@unfoldedcircle/integration-api";
 import { Zone } from "node-roon-api";

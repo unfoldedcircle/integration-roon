@@ -1,3 +1,10 @@
+/**
+ * Roon integration driver for Remote Two/3.
+ *
+ * @copyright (c) 2024 by Unfolded Circle ApS.
+ * @license Mozilla Public License Version 2.0, see LICENSE for more details.
+ */
+
 import * as uc from "@unfoldedcircle/integration-api";
 import { AbortDriverSetup } from "@unfoldedcircle/integration-api";
 import RoonApi, { Core, Zone } from "node-roon-api";
@@ -51,7 +58,7 @@ export default class RoonDriver {
     if (msg instanceof uc.UserConfirmationResponse) {
       return this.handleDriverSetupUserConfirmation(msg);
     }
-    console.log("[uc_roon] Unknown Roon integration setup message", msg);
+    console.error("[uc_roon] Unknown Roon integration setup message", msg);
     return new uc.AbortDriverSetup("Unknown Roon integration setup message");
   }
 
@@ -61,7 +68,7 @@ export default class RoonDriver {
     }
     const img = convertImageToBase64("./assets/setupimg.png");
     if (!img) {
-      console.log("[uc_roon] Failed to convert image to base64");
+      console.error("[uc_roon] Failed to convert image to base64");
       return new AbortDriverSetup("Failed to process image during setup");
     }
     return new uc.RequestUserConfirmation(
@@ -104,14 +111,14 @@ export default class RoonDriver {
     try {
       await this.driver.setDeviceState(uc.DeviceStates.Connected);
     } catch (e) {
-      console.log(`[uc_roon] Failed to get Roon zones: ${e}`);
+      console.error(`[uc_roon] Failed to get Roon zones: ${e}`);
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     }
   }
 
   private async handleSubscribeEntities(entityIds: string[]) {
     if (!this.roonCore) {
-      console.log("[uc_roon] Can't send entity data after subscribe: Roon core not available");
+      console.warn("[uc_roon] Can't send entity data after subscribe: Roon core not available");
       return;
     }
 
@@ -150,12 +157,12 @@ export default class RoonDriver {
 
   private async subscribeRoonZones() {
     if (this.roonCore == null) {
-      console.log("[uc_roon] Cannot subscribe to Roon zones. RoonCore is null.");
+      console.warn("[uc_roon] Cannot subscribe to Roon zones. RoonCore is null.");
       return;
     }
 
     if (this.roonTransport == null) {
-      console.log("[uc_roon] Cannot subscribe to Roon zones. RoonTransport is null.");
+      console.warn("[uc_roon] Cannot subscribe to Roon zones. RoonTransport is null.");
       return;
     }
 
@@ -226,7 +233,7 @@ export default class RoonDriver {
           },
           (error, contentType, image) => {
             if (error) {
-              console.log(`[uc_roon] Failed to get image: ${error}`);
+              console.warn(`[uc_roon] Failed to get image: ${error}`);
             } else if (image) {
               this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, {
                 [uc.MediaPlayerAttributes.MediaImageUrl]: "data:image/png;base64," + image.toString("base64")
@@ -260,19 +267,19 @@ export default class RoonDriver {
 
   private async getRoonZones(): Promise<void> {
     if (this.roonCore == null) {
-      console.log("[uc_roon] Cannot get Roon zones. RoonCore is null.");
+      console.warn("[uc_roon] Cannot get Roon zones. RoonCore is null.");
       return;
     }
 
     if (this.roonTransport == null) {
-      console.log("[uc_roon] Cannot get Roon zones. RoonTransport is null.");
+      console.warn("[uc_roon] Cannot get Roon zones. RoonTransport is null.");
       return;
     }
 
     return new Promise((resolve, reject) => {
       this.roonTransport.get_zones(async (error, data) => {
         if (error) {
-          console.log("[uc_roon] Failed to get Roon Zones");
+          console.warn("[uc_roon] Failed to get Roon Zones");
           reject(error);
         }
 

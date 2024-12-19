@@ -1,6 +1,6 @@
-# Roon integration for Remote Two
+# Roon integration for Remote Two/3
 
-The Unfolded Circle Roon integration for Remote Two is part of the firmware.
+The Unfolded Circle Roon integration for Remote Two/3 is part of the firmware.
 
 ## Licenses
 
