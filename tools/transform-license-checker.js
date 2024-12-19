@@ -4,8 +4,8 @@
 // license-checker --json > licenses.json
 // node transform-license-checker.js licenses.json licenses.md
 
-const fs = require("fs");
-const { execSync } = require("child_process");
+import fs from "fs";
+import { execSync } from "child_process";
 
 const TIMEOUT = 10000;
 
