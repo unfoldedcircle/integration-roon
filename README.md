@@ -1,79 +1,87 @@
-# Sonos integration for Remote Two
+# Roon integration for Unfolded Circle Remotes
 
-### Installation
+Unfolded Circle Remote integration driver for [Roon](https://roon.app/).
 
-`npm install`
+This integration driver is included in the Unfolded Circle Remote firmware and does not need to be run as external
+integration to control Roon. A standalone driver can be used for development or custom functionality.
 
-### Running the app
+The integration implements the UC Remote [Integration-API](https://github.com/unfoldedcircle/core-api) which
+communicates with JSON messages over WebSocket.
 
-`node driver.js`
+## Standalone usage
 
-### Configuration
+### Setup
 
-Fill out the configuration options in `driver.json`, especially `port` and `driver_url`.
+Requirements:
 
-You need to manually register the driver and create an integration in the core:
+- Remote Two firmware 1.9.3 or newer with support for custom integrations.
+- Install [nvm](https://github.com/nvm-sh/nvm) (Node.js version manager) for local development.
+- Node.js v20.16 or newer (older versions are not tested).
+- Install required libraries:
 
----
-
-The driver uses discovery for speakers. These will be available for the core to setup.
-
-To register the integration send via websockets:
-
-```
-{
-    "kind": "req",
-    "id": 3,
-    "msg": "register_integration_driver",
-    "msg_data": {
-        "driver_id": "uc_node_roon_driver",
-        "name": {
-            "en": "Roon Integration"
-        },
-        "driver_url": "ws://localhost:8095",
-        "version": "0.0.1",
-        "enabled": true,
-        "description": {
-            "en": "Control Roon with Remote Two."
-        },
-        "developer": {
-		"name": "Unfolded Circle",
-		"email": "support@unfoldedcircle.com",
-		"url": "https://www.unfoldedcircle.com/support"
-        },
-        "home_page": "https://www.unfoldedcircle.com",
-        "release_date": "2022-07-24",
-        "device_discovery": false
-    }
-}
+```shell
+npm install
 ```
 
-Create an integration:
+For running a separate integration driver on your network for UC Remotes, the configuration in file
+[driver.json](driver.json) needs to be changed:
 
-```
-{
-    "kind": "req",
-    "id": 4,
-    "msg": "create_integration",
-    "msg_data": {
-        "driver_id": "uc_node_roon_driver",
-        "name": {
-            "en": "Roon Integration"
-        },
-        "enabled": true
-    }
-}
+- Set `driver_id` to a unique value, `uc_roon_driver` is already used for the embedded driver in the firmware.
+- Change `name` to easily identify the driver in discovery & setup with the Remote or the web-configurator.
+- Optionally add a `"port": 8090` field for the WebSocket server listening port.
+  - Default port: `9090`
+  - Also overrideable with environment variable `UC_INTEGRATION_HTTP_PORT`
+
+### Run
+
+Build JavaScript from TypeScript:
+
+```shell
+npm run build
 ```
 
-Delete:
+Run as external integration driver:
 
+```shell
+UC_CONFIG_HOME=. UC_INTEGRATION_HTTP_PORT=8079 node dist/index.js
 ```
-{
-    "kind": "req",
-    "id": 5,
-    "msg": "delete_integration_driver",
-    "msg_data": {
-        "driver_id": "uc_node_roon_driver"
-    }
-}
+
+The configuration files are loaded & saved from the path specified in the environment variable `UC_CONFIG_HOME`.
+
+- The Roon API library will automatically create and load the Roon pairing token from `config.json`.
+- The Roon integration driver stores zone information in `roon_config.json`.
+
+### Logging
+
+The [Unfolded Circle Integration-API library](https://github.com/unfoldedcircle/integration-node-library) is using the
+[debug](https://www.npmjs.com/package/debug) module for logging.
+
+To enable the integration library logging, run the driver with the `DEBUG` environment variable set like:
+
+```shell
+DEBUG=* node dist/index.js
 ```
+
+Additional information:
+
+- [Node.js API wrapper log namespaces](https://github.com/unfoldedcircle/integration-node-library?tab=readme-ov-file#logging)
+  - Enable WebSocket message trace: `ucapi:msg`
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the
+[tags and releases in this repository](https://github.com/unfoldedcircle/integration-roon/releases).
+
+## Changelog
+
+The major changes found in each new release are listed in the [changelog](CHANGELOG.md)
+and under the GitHub [releases](https://github.com/unfoldedcircle/integration-roon/releases).
+
+## Contributions
+
+Please read our [contribution guidelines](CONTRIBUTING.md) before opening a pull request.
+
+## License
+
+This project is licensed under the [**Mozilla Public License 2.0**](https://choosealicense.com/licenses/mpl-2.0/).
+See the [LICENSE](LICENSE) file for details.
