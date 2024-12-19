@@ -105,6 +105,5 @@ dist
 .DS_Store
 config.json
 configured.json
-config.json
 
 *.http
