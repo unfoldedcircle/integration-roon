@@ -1,12 +1,12 @@
 {
   "driver_id": "uc_roon_driver",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Roon" },
   "icon": "uc:integration",
   "description": {
-    "en": "Control Roon with Remote Two.",
-    "de": "Steuere Roon mit Remote Two"
+    "en": "Control Roon with Remote Two/3.",
+    "de": "Steuere Roon mit Remote Two/3."
   },
   "developer": {
     "name": "Unfolded Circle ApS",
