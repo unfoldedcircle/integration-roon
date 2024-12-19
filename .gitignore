@@ -105,5 +105,6 @@ dist
 .DS_Store
 config.json
 configured.json
+roon_config.json
 
 *.http
