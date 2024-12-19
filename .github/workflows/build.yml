@@ -105,7 +105,8 @@ jobs:
 
   release:
     name: Create Release
-    if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
+    # ONLY FOR PR TESTING !!!
+    # if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
     runs-on: ubuntu-latest
     needs: [build]
 
