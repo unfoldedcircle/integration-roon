@@ -82,11 +82,11 @@ jobs:
           mv artifacts/dist artifacts/bin
           mv artifacts/bin/index.js artifacts/bin/driver.js
           cp -r assets artifacts/bin/
+          cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
-          cd artifacts
           # patch metadata to not conflict with pre-installed driver
-          jq '.driver_id = "uc_roon_driver_custom" | .name.en = "Roon custom"' driver.json
+          jq '.driver_id = "uc_roon_driver_custom" | .name.en = "Roon custom"' driver.json > artifacts/driver.json
           echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV
 
       - name: Create upload artifact
