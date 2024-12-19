@@ -7,6 +7,8 @@ import RoonApiTransport, { SubscribeZoneChanged, SubscribeZoneSubscribed } from 
 import Config from "./config.js";
 import { convertImageToBase64, delay, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
 
+import os from "os";
+
 export default class RoonDriver {
   private driver: uc.IntegrationAPI;
   private roon: RoonApi;
@@ -24,7 +26,7 @@ export default class RoonDriver {
     this.initLocalZones();
     this.roon = new RoonApi({
       extension_id: "com.uc.remote",
-      display_name: "Unfolded Circle Roon Integration",
+      display_name: `Remote Two/3 Integration (${os.hostname()})`,
       display_version: this.driver.getDriverVersion().version.driver,
       publisher: "Unfolded Circle",
       email: "support@unfoldedcircle.com",
