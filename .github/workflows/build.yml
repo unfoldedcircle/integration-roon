@@ -19,10 +19,11 @@ on:
 env:
   INTG_NAME: roon
   HASH_FILENAME: uc-intg-roon.hash
+  BUILD_CHANGELOG: build-changelog.md
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,10 +104,24 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: "Create Changelog"
+        run: |
+          npm install -g conventional-changelog-cli
+          conventional-changelog -p conventionalcommits -u -o ${{ env.BUILD_CHANGELOG }}
+          cat ${{ env.BUILD_CHANGELOG }}
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: ${{ env.BUILD_CHANGELOG }}
+          if-no-files-found: error
+          retention-days: 3
+
   release:
     name: Create Release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [build]
 
     steps:
@@ -137,14 +152,31 @@ jobs:
           for filename in *.tar.gz; do mv $filename "$(basename $filename .tar.gz)-${{ env.TIMESTAMP }}.tar.gz"; done;
           for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
 
+      # Checkout is required for the next `gh release delete` step
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      # We have to delete the "latest" release, otherwise `softprops/action-gh-release` will only append the new artifact.
+      # This simulates the old marvinpinto/action-automatic-releases action.
+      - name: Remove previous pre-release
+        run: |
+          cd main
+          gh release delete latest --cleanup-tag -y || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Use conventional commit changelog, and append the GitHub generated changelog
       - name: Create Pre-Release
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: softprops/action-gh-release@v2
         if: "!contains(github.ref, 'tags/v')"
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
           prerelease: true
-          title: "Development Build"
+          tag_name: latest
+          body_path: ${{ env.BUILD_CHANGELOG }}
+          generate_release_notes: true
+          name: "Development Build"
           files: |
             *.tar.gz
             ${{ env.HASH_FILENAME }}
@@ -155,11 +187,11 @@ jobs:
           for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
 
       - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: softprops/action-gh-release@v2
         if: "contains(github.ref, 'tags/v')"
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
+          generate_release_notes: true
           files: |
             *.tar.gz
             ${{ env.HASH_FILENAME }}
