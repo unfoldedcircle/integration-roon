@@ -65,6 +65,8 @@ export default class RoonDriver {
 
   private handleDriverSetupRequest(msg: uc.DriverSetupRequest): uc.SetupAction {
     if (msg.reconfigure) {
+      // TODO redesign setup flow: do we really want to delete the configration at this point?
+      //      This should be done as late as possible: the user should not loose the old cfg if setup fails!
       this.config.clear();
     }
     const img = convertImageToBase64("./assets/setupimg.png");
@@ -113,12 +115,7 @@ export default class RoonDriver {
 
   private async handleConnect() {
     this.roonApiStatus?.set_status("Connected", false);
-    try {
-      await this.driver.setDeviceState(uc.DeviceStates.Connected);
-    } catch (e) {
-      console.error(`[uc_roon] Failed to get Roon zones: ${e}`);
-      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
-    }
+    await this.driver.setDeviceState(uc.DeviceStates.Connected);
   }
 
   private async handleSubscribeEntities(entityIds: string[]) {
@@ -155,10 +152,12 @@ export default class RoonDriver {
   private async handleEnterStandby() {
     log.info("enter standby");
     this.roonApiStatus?.set_status("Standby", false);
+    // TODO #56 force Roon disconnect
   }
 
   private async handleExitStandby() {
     log.info("exit standby");
+    // TODO #56 force Roon reconnect
     this.roonApiStatus?.set_status("Connected", false);
   }
 
@@ -262,6 +261,8 @@ export default class RoonDriver {
 
     log.info(`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
+    // FIXME getRoonZones will clear the configuration and add newly available zones!
+    //       But once setup is run, we should not dynamically add new zones
     await this.getRoonZones();
     await this.subscribeRoonZones();
   }
