@@ -316,12 +316,14 @@ export default class RoonDriver {
   ): Promise<uc.StatusCodes> {
     if (!this.roonPaired) {
       log.error(`Roon is not paired. Not executing command ${command}`);
-      return uc.StatusCodes.ServerError;
+      this.setEntityState(entity.id, uc.MediaPlayerStates.Unavailable);
+      return uc.StatusCodes.ServiceUnavailable;
     }
 
     if (!this.roonTransport) {
       log.error(`RoonTransport is not initialized. Not executing command ${command}`);
-      return uc.StatusCodes.ServerError;
+      this.setEntityState(entity.id, uc.MediaPlayerStates.Unavailable);
+      return uc.StatusCodes.ServiceUnavailable;
     }
 
     return new Promise((resolve) => {
@@ -438,6 +440,12 @@ export default class RoonDriver {
 
   private getDefaultZoneOutput(zoneId: string) {
     return this.config.getZone(zoneId)?.outputs?.[0];
+  }
+
+  private setEntityState(entityId: string, state: uc.MediaPlayerStates) {
+    this.driver.getConfiguredEntities().updateEntityAttributes(entityId, {
+      [uc.MediaPlayerAttributes.State]: state
+    });
   }
 
   async init() {
