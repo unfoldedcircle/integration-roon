@@ -31,16 +31,17 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   }
 
   // state
+  let state = uc.MediaPlayerStates.Unknown;
   switch (zone.state) {
     case "playing":
-      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Playing;
+      state = uc.MediaPlayerStates.Playing;
       break;
-
     case "stopped":
     case "paused":
-      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Paused;
+      state = uc.MediaPlayerStates.Paused;
       break;
   }
+  attr[uc.MediaPlayerAttributes.State] = state;
 
   if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
     // volume
