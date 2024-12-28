@@ -6,6 +6,7 @@
  */
 
 import fs from "fs";
+import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { Zone } from "node-roon-api";
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -16,7 +17,7 @@ export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
   try {
     data = fs.readFileSync(file, "base64");
   } catch (e) {
-    console.log(e);
+    log.error(e);
   }
 
   return data;
