@@ -8,7 +8,9 @@
 import fs from "fs";
 import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
-import { Zone } from "node-roon-api";
+import { RepeatMode } from "@unfoldedcircle/integration-api";
+import { LoopSetting, Zone } from "node-roon-api";
+
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
@@ -78,8 +80,33 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   attr[uc.MediaPlayerAttributes.MediaDuration] = mediaDuration;
   attr[uc.MediaPlayerAttributes.MediaPosition] = mediaPosition;
 
+  attr[uc.MediaPlayerAttributes.Shuffle] = !!zone.settings?.shuffle;
+  attr[uc.MediaPlayerAttributes.Repeat] = getRepeatMode(zone);
+
   return attr;
 };
+
+export function getLoopMode(repeat: string | undefined): LoopSetting {
+  switch (repeat) {
+    case RepeatMode.All:
+      return "loop";
+    case RepeatMode.One:
+      return "loop_one";
+    default:
+      return "disabled";
+  }
+}
+
+function getRepeatMode(zone: Zone): RepeatMode {
+  switch (zone.settings?.loop) {
+    case "loop":
+      return RepeatMode.All;
+    case "loop_one":
+      return RepeatMode.One;
+    default:
+      return RepeatMode.Off;
+  }
+}
 
 export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) {
   const features = [
@@ -94,7 +121,9 @@ export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) 
     uc.MediaPlayerFeatures.MediaTitle,
     uc.MediaPlayerFeatures.MediaArtist,
     uc.MediaPlayerFeatures.MediaAlbum,
-    uc.MediaPlayerFeatures.MediaImageUrl
+    uc.MediaPlayerFeatures.MediaImageUrl,
+    uc.MediaPlayerFeatures.Shuffle,
+    uc.MediaPlayerFeatures.Repeat
   ];
 
   // TODO add & test REPEAT, SHUFFLE
