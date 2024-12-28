@@ -1,7 +1,7 @@
 {
   "name": "uc-integration-roon",
   "type": "module",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Roon Integration for the Unfolded Circle",
   "main": "dist/index.js",
   "scripts": {

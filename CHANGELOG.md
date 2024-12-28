@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.3.1 - 2024-12-28
+
 ### Breaking Changes
 
 - Setup flow must be run on the Remote to make sure the Roon zone configuration is properly stored.
@@ -23,8 +27,6 @@ _Changes in the next release_
 
 - Setup instructions at the start of the integration setup flow.
 - Use debug module for logging ([#53](https://github.com/unfoldedcircle/integration-roon/issues/53)).
-
----
 
 ## 0.3.0 - 2024-12-19
 
