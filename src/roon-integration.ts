@@ -88,6 +88,7 @@ export default class RoonDriver {
     await delay(3000);
     if (this.roonPaired) {
       await this.getRoonZones();
+      // TODO let user choose which Zones to add
       return new uc.SetupComplete();
     }
     return new uc.SetupError("Failed to pair with Roon");
@@ -97,12 +98,18 @@ export default class RoonDriver {
    * Load saved configuration and create an available media-player entity for each zone.
    */
   private initLocalZones() {
+    let count = 0;
     this.config.forEachZone((zone) => {
       log.info(`Creating media-player for configured zone: ${zone.display_name} (${zone.zone_id})`);
       const entity = newEntityFromZone(zone, true);
       entity.setCmdHandler(this.handleEntityCommand.bind(this));
       this.driver.addAvailableEntity(entity);
+      count++;
     });
+
+    if (count == 0) {
+      log.warn("Setup required: no configured zones found!");
+    }
   }
 
   private setupDriverEvents() {
@@ -119,6 +126,7 @@ export default class RoonDriver {
   }
 
   private async handleSubscribeEntities(entityIds: string[]) {
+    log.debug("Subscribe entities: %s", entityIds);
     if (!this.roonCore) {
       log.warn("Can't send entity data after subscribe: Roon core not available");
       return;
@@ -150,25 +158,25 @@ export default class RoonDriver {
   }
 
   private async handleEnterStandby() {
-    log.info("enter standby");
+    log.debug("enter standby");
     this.roonApiStatus?.set_status("Standby", false);
     // TODO #56 force Roon disconnect
   }
 
   private async handleExitStandby() {
-    log.info("exit standby");
+    log.debug("exit standby");
     // TODO #56 force Roon reconnect
     this.roonApiStatus?.set_status("Connected", false);
   }
 
   private async subscribeRoonZones() {
     if (this.roonCore == null) {
-      log.warn("Cannot subscribe to Roon zones. RoonCore is null.");
+      log.warn("Cannot subscribe to Roon zones. Roon Core not available.");
       return;
     }
 
     if (this.roonTransport == null) {
-      log.warn("Cannot subscribe to Roon zones. RoonTransport is null.");
+      log.warn("Cannot subscribe to Roon zones. Roon Transport not available.");
       return;
     }
 
@@ -179,13 +187,13 @@ export default class RoonDriver {
           const data = msg as SubscribeZoneChanged;
           if (data.zones_changed) {
             data.zones_changed.forEach((zone: Zone) => {
-              log.info(`Zone changed: ${zone.display_name} (${zone.zone_id})`);
+              log.debug(`Zone changed: ${zone.display_name}`);
               this.updateMediaPlayerFromZone(zone);
             });
           } else if (data.zones_seek_changed) {
             data.zones_seek_changed.forEach((zone) => {
               if (!this.driver.getConfiguredEntities().contains(zone.zone_id)) {
-                log.info(`Configured entity not found, not updating seek:(${zone.zone_id})`);
+                log.debug(`Configured entity not found, not updating seek:(${zone.zone_id})`);
                 return;
               }
 
@@ -201,7 +209,7 @@ export default class RoonDriver {
           if (data.zones) {
             data.zones.forEach((zone) => {
               if (this.updateMediaPlayerFromZone(zone)) {
-                log.info(`Subscribed: ${zone.display_name} (${zone.zone_id})`);
+                log.info(`Subscribed: ${zone.display_name}`);
               }
             });
           }
@@ -261,9 +269,6 @@ export default class RoonDriver {
 
     log.info(`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
-    // FIXME getRoonZones will clear the configuration and add newly available zones!
-    //       But once setup is run, we should not dynamically add new zones
-    await this.getRoonZones();
     await this.subscribeRoonZones();
   }
 
@@ -272,6 +277,17 @@ export default class RoonDriver {
     this.roonPaired = false;
     this.roonCore = null;
     this.roonImage = null;
+    // #56 set all entities to unavailable if we are no longer paired with the Roon core
+    // TODO enhance integration-library with helper functions to retrieve all entity IDs or update all entity states
+    this.driver
+      .getConfiguredEntities()
+      .getEntities()
+      .forEach((entity) => {
+        const entityId = entity.entity_id?.toString();
+        if (entityId) {
+          this.setEntityState(entityId, uc.MediaPlayerStates.Unavailable);
+        }
+      });
   }
 
   private async getRoonZones(): Promise<void> {
