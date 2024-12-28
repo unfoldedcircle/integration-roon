@@ -16,6 +16,8 @@ declare module "node-roon-api-transport" {
   };
 
   type SubscribeZoneChanged = {
+    zones_added?: Zone[];
+    zones_removed?: string[];
     zones_changed?: Zone[];
     zones_seek_changed?: {
       zone_id: string;
@@ -48,7 +50,7 @@ declare module "node-roon-api-transport" {
     group_outputs(outputs: (Output | string)[], cb?: ResultCallback): void;
     ungroup_outputs(outputs: (Output | string)[], cb?: ResultCallback): void;
     change_settings(zoneOrOutput: Zone | Output | string, settings: ZoneSettings, cb?: ResultCallback): void;
-    get_zones(cb: (error: false | string, body: { zones: Zone[] }) => void): void;
+    get_zones(cb?: (error: false | string, body: { zones: Zone[] }) => void): void;
     get_outputs(cb: (error: false | string, body: { outputs: Output[] }) => void): void;
     subscribe_outputs(cb: (response: string, msg: any) => void): void;
     subscribe_zones(cb: (response: SubscribeZoneResponse, msg: SubscribeZoneMsg) => void): void;

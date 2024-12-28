@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Breaking Changes
+
+- Setup flow must be run on the Remote to make sure the Roon zone configuration is properly stored.
+  - Already configured entities can be left as is, they will work as long as the Roon zone is still available.
+  - Roon zone configuration is now locally stored at the time of setup. New zones won't automatically create a new media-player entity ([#57](https://github.com/unfoldedcircle/integration-roon/pull/57)).
+
+### Fixed
+
+- Handle Roon core pairing / unpairing and zone added / removed events to set media-player entity state ([#57](https://github.com/unfoldedcircle/integration-roon/pull/57)).
+
+### Changed
+
+- Setup instructions at the start of the integration setup flow.
+- Use debug module for logging ([#53](https://github.com/unfoldedcircle/integration-roon/issues/53)).
+
 ---
 
 ## 0.3.0 - 2024-12-19
