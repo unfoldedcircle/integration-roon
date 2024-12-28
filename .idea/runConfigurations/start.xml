@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="start" type="js.build_tools.npm" nameIsGenerated="true">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="start" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="DEBUG" value="*" />
+      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
+      <env name="UC_INTEGRATION_HTTP_PORT" value="8098" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

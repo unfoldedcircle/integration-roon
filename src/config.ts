@@ -30,6 +30,11 @@ class Config {
     this.saveToFile();
   }
 
+  public hasZone(zoneId: string): boolean {
+    const zone = this.getZone(zoneId);
+    return !!zone;
+  }
+
   public getZone(zoneId: string): Zone | null {
     return this.zones[zoneId] ?? null;
   }

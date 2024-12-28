@@ -6,6 +6,7 @@
  */
 
 import fs from "fs";
+import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { Zone } from "node-roon-api";
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -16,7 +17,7 @@ export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
   try {
     data = fs.readFileSync(file, "base64");
   } catch (e) {
-    console.log(e);
+    log.error(e);
   }
 
   return data;
@@ -30,16 +31,17 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   }
 
   // state
+  let state = uc.MediaPlayerStates.Unknown;
   switch (zone.state) {
     case "playing":
-      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Playing;
+      state = uc.MediaPlayerStates.Playing;
       break;
-
     case "stopped":
     case "paused":
-      attr[uc.MediaPlayerAttributes.State] = uc.MediaPlayerStates.Paused;
+      state = uc.MediaPlayerStates.Paused;
       break;
   }
+  attr[uc.MediaPlayerAttributes.State] = state;
 
   if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
     // volume

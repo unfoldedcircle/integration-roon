@@ -1,9 +1,9 @@
 {
   "driver_id": "uc_roon_driver",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "min_core_api": "0.20.0",
   "name": { "en": "Roon" },
-  "icon": "uc:integration",
+  "icon": "uc:music",
   "description": {
     "en": "Control Roon with Remote Two/3.",
     "de": "Steuere Roon mit Remote Two/3."
@@ -29,13 +29,13 @@
         "field": {
           "label": {
             "value": {
-              "en": "The integration will enable an extension for Roon on your network.",
-              "de": "Diese Integration ermöglicht die Steuerung von Roon im Netzwerk."
+              "en": "- The integration will enable an extension for Roon on your network.\n- The extension needs to be authorized in the Roon application under _Settings, Extensions_.\n- All available Roon zones at the time of the setup process are stored in the integration.\n- To add or remove a zone, the setup needs to be run again.\n- A media-player entity is created for each zone to control playback and show media artwork.",
+              "de": "- Die Integration wird eine Erweiterung für Roon in Ihrem Netzwerk aktivieren.\n- Die Erweiterung muss in der Roon-Anwendung unter _Einstellungen, Erweiterungen_ autorisiert werden.\n- Alle zum Zeitpunkt des Setup-Prozesses verfügbaren Roon-Zonen werden in der Integration gespeichert.\n- Um eine Zone hinzuzufügen oder zu entfernen, muss das Setup erneut ausgeführt werden.\n- Für jede Zone wird eine Medienplayer-Entität erstellt, um die Wiedergabe zu steuern und Mediencover anzuzeigen."
             }
           }
         }
       }
     ]
   },
-  "release_date": "2024-12-19"
+  "release_date": "2024-12-28"
 }

@@ -43,7 +43,7 @@ npm run build
 Run as external integration driver:
 
 ```shell
-UC_CONFIG_HOME=. UC_INTEGRATION_HTTP_PORT=8079 node dist/index.js
+UC_CONFIG_HOME=. UC_INTEGRATION_HTTP_PORT=8079 npm run start
 ```
 
 The configuration files are loaded & saved from the path specified in the environment variable `UC_CONFIG_HOME`.
@@ -53,13 +53,26 @@ The configuration files are loaded & saved from the path specified in the enviro
 
 ### Logging
 
-The [Unfolded Circle Integration-API library](https://github.com/unfoldedcircle/integration-node-library) is using the
-[debug](https://www.npmjs.com/package/debug) module for logging.
-
-To enable the integration library logging, run the driver with the `DEBUG` environment variable set like:
+Logging any kind of output is directed to the [debug](https://www.npmjs.com/package/debug) module.
+To let the integration driver output anything, run the driver with the `DEBUG` environment variable set like:
 
 ```shell
-DEBUG=* node dist/index.js
+DEBUG=roon:* npm run start
+```
+
+The driver exposes the following log-levels:
+
+Log namespaces:
+
+- `roon:debug`: debugging messages
+- `roon:info`: informational messages like server up and running, device connected or disconnected
+- `roon:warn`: warnings
+- `roon:error`: errors
+
+If you only want to get errors and warnings reported:
+
+```shell
+DEBUG=roon:warn,roon:error npm run start
 ```
 
 Additional information:
