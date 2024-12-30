@@ -39,7 +39,6 @@ export default class RoonDriver {
       publisher: "Unfolded Circle",
       email: "support@unfoldedcircle.com",
       website: "https://unfoldedcircle.com",
-      log_level: "none",
       core_paired: this.handleRoonCorePaired.bind(this),
       core_unpaired: this.handleRoonCoreUnpaired.bind(this),
       configDir: this.driver.getConfigDirPath()
@@ -121,6 +120,7 @@ export default class RoonDriver {
   }
 
   private async handleConnect() {
+    this.roon.start_discovery();
     this.roonApiStatus?.set_status("Connected", false);
     await this.driver.setDeviceState(uc.DeviceStates.Connected);
   }
@@ -160,14 +160,16 @@ export default class RoonDriver {
   private async handleEnterStandby() {
     log.debug("enter standby");
     this.roonApiStatus?.set_status("Standby", false);
-    // TODO #56 force Roon disconnect, but how?
+    // #56 force Roon disconnect
+    this.roon.stop_discovery();
+    this.roon.disconnect_all();
   }
 
   private async handleExitStandby() {
-    log.debug("exit standby");
-    // TODO #56 force Roon reconnect
-    // No disconnect method found in API! Let's try sending a request, maybe this triggers a reconnect
-    this.roonTransport?.get_zones();
+    log.info("exit standby");
+    // #56 force Roon reconnect
+    this.roon.start_discovery();
+
     this.roonApiStatus?.set_status("Connected", false);
   }
 
@@ -214,7 +216,7 @@ export default class RoonDriver {
                 return;
               }
               if (!this.driver.getConfiguredEntities().contains(zone.zone_id)) {
-                log.debug(`Configured entity not found, not updating seek:(${zone.zone_id})`);
+                log.debug(`Configured entity not found, not updating seek: ${zone.zone_id}`);
                 return;
               }
 
@@ -259,7 +261,7 @@ export default class RoonDriver {
     }
 
     if (!this.driver.getConfiguredEntities().contains(zone.zone_id)) {
-      log.info(`Configured entity not found, not updating: ${zone.display_name} (${zone.zone_id})`);
+      log.info(`Configured entity not found, not updating: ${zone.display_name}`);
       return false;
     }
     const attr = mediaPlayerAttributesFromZone(zone);
@@ -373,6 +375,8 @@ export default class RoonDriver {
       this.setEntityState(entity.id, uc.MediaPlayerStates.Unavailable);
       return uc.StatusCodes.ServiceUnavailable;
     }
+
+    log.info(`Command: ${command}`);
 
     return new Promise((resolve) => {
       switch (command) {

@@ -191,8 +191,6 @@ declare module "node-roon-api" {
     email: string;
     /** (Optional) Website for more information about the extension. */
     website?: string;
-    /** Determines the level of logging: "all", "none", or other values for selective logging. */
-    log_level: string;
     /** (Optional) Directory to store configuration files. */
     configDir?: string;
     /** (Optional) Callback invoked when Roon pairs your extension with a Core. */
@@ -224,6 +222,20 @@ declare module "node-roon-api" {
      * Begins the discovery process to find/connect to a Roon Core.
      */
     start_discovery(): void;
+
+    /**
+     * Stop the discovery process to automatically connect to a Roon core.
+     *
+     * To restart the discovery process, call `start_discovery` again.
+     */
+    stop_discovery(): void;
+
+    /**
+     * Disconnect all Roon core WebSocket connections.
+     *
+     * To remain disconnected, call `stop_discovery` first.
+     */
+    disconnect_all(): void;
 
     /**
      * Internal method for periodic scanning during discovery.

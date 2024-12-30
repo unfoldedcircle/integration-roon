@@ -13,6 +13,10 @@ _Changes in the next release_
 
 - Shuffle and repeat ([#28](https://github.com/unfoldedcircle/integration-roon/issues/28)).
 
+### Fixed
+
+- Much faster reconnection to Roon core after waking up from standby ([#56](https://github.com/unfoldedcircle/integration-roon/pull/56)).
+
 ---
 
 ## 0.3.1 - 2024-12-28
