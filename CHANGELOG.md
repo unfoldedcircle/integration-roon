@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+
+- Shuffle and repeat ([#28](https://github.com/unfoldedcircle/integration-roon/issues/28)).
+
 ---
 
 ## 0.3.1 - 2024-12-28

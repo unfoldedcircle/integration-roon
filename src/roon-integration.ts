@@ -13,7 +13,7 @@ import RoonApiImage from "node-roon-api-image";
 import RoonApiStatus from "node-roon-api-status";
 import RoonApiTransport, { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
 import Config from "./config.js";
-import { convertImageToBase64, delay, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
+import { convertImageToBase64, delay, getLoopMode, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
 
 import os from "os";
 
@@ -474,6 +474,28 @@ export default class RoonDriver {
           this.roonTransport?.seek(entity.id, "absolute", Number(params?.media_position), async (error) => {
             if (error) {
               log.error(`Error seeking media player: ${error}`);
+              resolve(uc.StatusCodes.ServerError);
+            } else {
+              resolve(uc.StatusCodes.Ok);
+            }
+          });
+          break;
+        case uc.MediaPlayerCommands.Shuffle:
+          const shuffle = !!params?.shuffle;
+          this.roonTransport?.change_settings(entity.id, { shuffle }, async (error) => {
+            if (error) {
+              log.error(`Shuffle error: ${error}`);
+              resolve(uc.StatusCodes.ServerError);
+            } else {
+              resolve(uc.StatusCodes.Ok);
+            }
+          });
+          break;
+        case uc.MediaPlayerCommands.Repeat:
+          let loop = getLoopMode(params?.repeat.toString());
+          this.roonTransport?.change_settings(entity.id, { loop }, async (error) => {
+            if (error) {
+              log.error(`Repeat error: ${error}`);
               resolve(uc.StatusCodes.ServerError);
             } else {
               resolve(uc.StatusCodes.Ok);
