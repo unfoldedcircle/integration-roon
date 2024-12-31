@@ -62,17 +62,31 @@ DEBUG=roon:* npm run start
 
 The driver exposes the following log-levels:
 
-Log namespaces:
+Log namespaces of the integration driver:
 
 - `roon:debug`: debugging messages
 - `roon:info`: informational messages like server up and running, device connected or disconnected
 - `roon:warn`: warnings
 - `roon:error`: errors
 
-If you only want to get errors and warnings reported:
+Log namespaces of the Roon API library:
+
+- `roonapi:msg`: message trace of WebSocket communication and SOOD discovery
+- `roonapi:debug`
+- `roonapi:info`
+- `roonapi:warn`
+- `roonapi:error`
+
+If you only want to get errors and warnings reported of the integration:
 
 ```shell
 DEBUG=roon:warn,roon:error npm run start
+```
+
+Errors and warnings of the Roon API and the integration:
+
+```shell
+DEBUG=roonapi:warn,roonapi:error,roon:warn,roon:error npm run start
 ```
 
 Additional information:
