@@ -15,7 +15,8 @@ _Changes in the next release_
 
 ### Fixed
 
-- Much faster reconnection to Roon core after waking up from standby ([#56](https://github.com/unfoldedcircle/integration-roon/pull/56)).
+- Much faster reconnection to Roon core after waking up from standby ([#59](https://github.com/unfoldedcircle/integration-roon/pull/59)).
+- Sporadic runtime crashes in RoonApi library ([#19](https://github.com/unfoldedcircle/integration-roon/issues/19)).
 
 ---
 
