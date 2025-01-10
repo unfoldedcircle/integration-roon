@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.4.0 - 2025-01-10
+
 ### Added
 
 - Shuffle and repeat ([#28](https://github.com/unfoldedcircle/integration-roon/issues/28)).
@@ -17,8 +21,6 @@ _Changes in the next release_
 
 - Much faster reconnection to Roon core after waking up from standby ([#59](https://github.com/unfoldedcircle/integration-roon/pull/59)).
 - Sporadic runtime crashes in RoonApi library ([#19](https://github.com/unfoldedcircle/integration-roon/issues/19)).
-
----
 
 ## 0.3.1 - 2024-12-28
 
