@@ -110,7 +110,6 @@ function getRepeatMode(zone: Zone): RepeatMode {
 
 export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) {
   const features = [
-    uc.MediaPlayerFeatures.OnOff,
     uc.MediaPlayerFeatures.MuteToggle,
     uc.MediaPlayerFeatures.PlayPause,
     uc.MediaPlayerFeatures.Next,
