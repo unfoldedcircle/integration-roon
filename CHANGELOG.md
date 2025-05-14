@@ -11,6 +11,12 @@ _Changes in the next release_
 
 ---
 
+## 0.4.1 - 2025-05-14
+
+### Fixed
+
+- Remove unsupported OnOff feature. This triggered errors in the user interface when sending unsupported commands ([#60](https://github.com/unfoldedcircle/integration-roon/pull/60)).
+
 ## 0.4.0 - 2025-01-10
 
 ### Added
