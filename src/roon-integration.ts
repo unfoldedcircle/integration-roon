@@ -8,10 +8,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { AbortDriverSetup } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
-import RoonApi, { Core, Zone } from "node-roon-api";
+import RoonApi from "node-roon-api";
+import type { Core, Zone } from "node-roon-api";
 import RoonApiImage from "node-roon-api-image";
 import RoonApiStatus from "node-roon-api-status";
-import RoonApiTransport, { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
+import RoonApiTransport from "node-roon-api-transport";
+import type { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
 import Config from "./config.js";
 import { convertImageToBase64, delay, getLoopMode, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
 
@@ -45,8 +47,6 @@ export default class RoonDriver {
     });
 
     this.roonApiStatus = new RoonApiStatus(this.roon);
-    this.roonTransport = new RoonApiTransport(this.roon);
-    this.roonImage = new RoonApiImage({} as any);
     this.setupDriverEvents();
   }
 
@@ -106,7 +106,7 @@ export default class RoonDriver {
       count++;
     });
 
-    if (count == 0) {
+    if (count === 0) {
       log.warn("Setup required: no configured zones found!");
     }
   }
@@ -198,9 +198,9 @@ export default class RoonDriver {
           }
 
           if (data.zones_removed) {
-            data.zones_removed.forEach((zone_id) => {
-              log.info(`Zone removed: ${zone_id}`);
-              this.setEntityState(zone_id, uc.MediaPlayerStates.Unavailable);
+            data.zones_removed.forEach((zoneId) => {
+              log.info(`Zone removed: ${zoneId}`);
+              this.setEntityState(zoneId, uc.MediaPlayerStates.Unavailable);
             });
           }
 
@@ -316,7 +316,7 @@ export default class RoonDriver {
       .getConfiguredEntities()
       .getEntities()
       .forEach((entity) => {
-        const entityId = entity.entity_id?.toString();
+        const entityId = entity.id as string;
         if (entityId) {
           this.setEntityState(entityId, uc.MediaPlayerStates.Unavailable);
         }
@@ -484,7 +484,7 @@ export default class RoonDriver {
             }
           });
           break;
-        case uc.MediaPlayerCommands.Shuffle:
+        case uc.MediaPlayerCommands.Shuffle: {
           const shuffle = !!params?.shuffle;
           this.roonTransport?.change_settings(entity.id, { shuffle }, async (error) => {
             if (error) {
@@ -495,8 +495,10 @@ export default class RoonDriver {
             }
           });
           break;
-        case uc.MediaPlayerCommands.Repeat:
-          let loop = getLoopMode(params?.repeat.toString());
+        }
+        case uc.MediaPlayerCommands.Repeat: {
+          const repeat = params?.repeat?.toString();
+          const loop = getLoopMode(repeat);
           this.roonTransport?.change_settings(entity.id, { loop }, async (error) => {
             if (error) {
               log.error(`Repeat error: ${error}`);
@@ -506,6 +508,7 @@ export default class RoonDriver {
             }
           });
           break;
+        }
         default:
           log.warn(`Unknown entity command: ${command}`);
           resolve(uc.StatusCodes.BadRequest);

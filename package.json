@@ -15,7 +15,7 @@
   "author": "Unfolded Circle",
   "license": "MPL-2.0",
   "dependencies": {
-    "@unfoldedcircle/integration-api": "github:unfoldedcircle/integration-node-library#a2e652506257bcec912a20630e95cd95728824ac",
+    "@unfoldedcircle/integration-api": "github:unfoldedcircle/integration-node-library#afc4216696d934e47686661c0c4a59187f9503da",
     "debug": "^4.4.3",
     "node-roon-api": "github:unfoldedcircle/node-roon-api#951a54534a6dae40740e81e49f3eb0a552b21442",
     "node-roon-api-image": "github:roonlabs/node-roon-api-image#a5f0efaf2dfb5457e91abe326c3a40d865131d32",
@@ -25,16 +25,14 @@
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
-    "@types/node": "^22.10.1",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-n": "^15.6.1",
-    "eslint-plugin-prettier": "^5.2.1",
-    "eslint-plugin-promise": "^6.6.0",
-    "prettier": "^3.3.3",
-    "semistandard": "^17.0.0",
-    "typescript": "^5.7.2"
+    "@types/node": "^22.13.9",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "globals": "^16.0.0",
+    "neostandard": "^0.12.2",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0"
   }
 }
