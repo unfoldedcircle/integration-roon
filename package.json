@@ -15,13 +15,13 @@
   "author": "Unfolded Circle",
   "license": "MPL-2.0",
   "dependencies": {
-    "@unfoldedcircle/integration-api": "^0.2.2",
-    "debug": "^4.4.0",
+    "@unfoldedcircle/integration-api": "github:unfoldedcircle/integration-node-library#a2e652506257bcec912a20630e95cd95728824ac",
+    "debug": "^4.4.3",
     "node-roon-api": "github:unfoldedcircle/node-roon-api#951a54534a6dae40740e81e49f3eb0a552b21442",
     "node-roon-api-image": "github:roonlabs/node-roon-api-image#a5f0efaf2dfb5457e91abe326c3a40d865131d32",
     "node-roon-api-status": "github:roonlabs/node-roon-api-status#504c918d6da267e03fbb4337befa71ca3d3c7526",
     "node-roon-api-transport": "github:roonlabs/node-roon-api-transport#2ee60008a4cdb90c34ff3de58bb4b949067f1d20",
-    "ws": "^8.18.0"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
