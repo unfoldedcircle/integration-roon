@@ -6,7 +6,7 @@
  */
 
 import fs from "fs";
-import { Zone } from "node-roon-api";
+import type { Zone } from "node-roon-api";
 import path from "path";
 
 const CFG_FILENAME = "roon_config.json";
