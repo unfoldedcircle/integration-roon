@@ -18,61 +18,121 @@ declare module "node-roon-api" {
     line2?: string;
     line3?: string;
   }
+  /**
+   * Now-playing information for a zone.
+   */
   export interface NowPlaying {
+    /** Seek Position in seconds, if applicable */
     seek_position?: number;
+    /** Length of media in seconds, if applicable */
     length?: number;
+    /** Now-playing image */
     image_key?: string;
+    /** Display text for one-line displays */
     one_line: OneLine;
+    /** Display text for two-line displays */
     two_line?: TwoLine;
+    /** Display text for three-line displays */
     three_line?: ThreeLine;
   }
+  /**
+   * The settings for a zone.
+   */
   export interface ZoneSettings {
+    /** loop setting on the zone */
     loop?: LoopSetting;
+    /** indicates whether shuffle is enabled on the zone */
     shuffle?: boolean;
+    /** indicates whether auto-radio mode is enabled on the zone */
     auto_radio?: boolean;
   }
+  /**
+   * Roon API Transport Service: Zone
+   */
   export interface Zone {
     zone_id: string;
+    /** Display Name for this zone */
     display_name: string;
+    /** The outputs in this zone */
     outputs: Output[];
     state: PlaybackState;
+    /** Current seek position for the zone */
     seek_position?: number;
+    /** Indicates whether the "previous" control is supported */
     is_previous_allowed: boolean;
+    /** Indicates whether the "next" control is supported */
     is_next_allowed: boolean;
+    /** Indicates whether the "pause" control is supported */
     is_pause_allowed: boolean;
+    /** Indicates whether the "play" control is supported */
     is_play_allowed: boolean;
+    /** Indicates whether the "seek" control is supported */
     is_seek_allowed: boolean;
+    /** Number of items in the play queue for this zone */
     queue_items_remaining?: number;
+    /** Number of seconds remaining in the play queue for this zone */
     queue_time_remaining?: number;
+    /** The default values for parties. */
     settings?: ZoneSettings;
+    /** Now-playing information for this zone, if playback is active */
     now_playing?: NowPlaying;
   }
+  /**
+   * Volume control information for an output.
+   * <p style='white-space: pre-wrap;'>
+   * Note that volume values, bounds, and step are floating point values, not integers, and that volume ranges can extend below and above zero, sometimes at the same time.
+   * </p>
+   */
   export interface Volume {
+    /**
+     * If you receive an unanticipated value for this, treat it like "number".
+     * The "incremental" type represents a volume control that just has "+" and "-" buttons,
+     * with no feedback about the current volume value or its range.
+     */
     type?: VolumeType;
+    /** The minimum value in the volume range */
     min?: number;
+    /** The maximum value in the volume range */
     max?: number;
+    /** The current value of the volume control */
     value?: number;
+    /** The step size for the volume control, in terms of its native units */
     step?: number;
+    /** True if the zone is muted, false otherwise */
     is_muted?: boolean;
   }
+  /**
+   * Source control information for an output.
+   */
   export interface SourceControl {
+    /** Display Name for this source control */
     display_name: string;
     status: "selected" | "deselected" | "standby" | "indeterminate";
+    /** true if this source control supports standby */
     supports_standby: boolean;
+    /** (Added based on JS context) control_key identifies the source control */
+    control_key?: string;
   }
+  /**
+   * Roon API Transport Service: Output
+   */
   export interface Output {
     output_id: string;
+    /** The zone that this output is a part of */
     zone_id: string;
+    /** Display Name for this output */
     display_name: string;
     state: PlaybackState;
+    /** Source controls for this output. */
     source_controls?: SourceControl[];
+    /** This field is populated for outputs that support volume control. */
     volume?: Volume;
   }
   export interface Zone {
     zone_id: string;
     display_name: string;
     outputs: Output[];
-    state: "playing" | "paused" | "loading" | "stopped";
+    state: PlaybackState;
     seek_position?: number;
     is_previous_allowed: boolean;
     is_next_allowed: boolean;
@@ -211,15 +271,18 @@ declare module "node-roon-api" {
    * Represents the RoonApi class.
    */
   export default class RoonApi {
+    /**
+     * @param options - Information about your extension. Used by Roon to display to the end user what is trying to access Roon.
+     */
     constructor(options: RoonApiOptions);
     /**
-     * Initializes the services required, optional, and provided by the extension.
+     * Initializes the services you require and that you provide.
      * @param services Configuration for services.
      */
     init_services(services: InitServicesOptions): void;
 
     /**
-     * Begins the discovery process to find/connect to a Roon Core.
+     * Begin the discovery process to find/connect to a Roon Core.
      */
     start_discovery(): void;
 
@@ -244,14 +307,14 @@ declare module "node-roon-api" {
     periodic_scan(): void;
 
     /**
-     * Saves a key-value pair in the configuration data store.
+     * Save a key value pair in the configuration data store.
      * @param key The configuration key.
      * @param value The value to save.
      */
     save_config(key: string, value: any): void;
 
     /**
-     * Loads a value from the configuration data store.
+     * Load a key value pair in the configuration data store.
      * @param key The configuration key.
      * @returns The loaded value, or undefined if not found.
      */
