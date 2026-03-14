@@ -9,24 +9,25 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { AbortDriverSetup } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import RoonApi from "node-roon-api";
-import type { Core, Zone } from "node-roon-api";
+import type { Core, Output, Zone } from "node-roon-api";
 import RoonApiImage from "node-roon-api-image";
 import RoonApiStatus from "node-roon-api-status";
 import RoonApiTransport from "node-roon-api-transport";
 import type { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
 import Config from "./config.js";
-import { convertImageToBase64, delay, getLoopMode, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
+import { convertImageToBase64, delay, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
+import type { RoonDriver as RoonDriverInterface } from "./media-player.js";
 
 import os from "os";
 
-export default class RoonDriver {
+export default class RoonDriver implements RoonDriverInterface {
   private driver: uc.IntegrationAPI;
   private readonly roon: RoonApi;
   private readonly roonApiStatus: RoonApiStatus;
   private roonCore: Core | null = null;
   private roonImage: RoonApiImage | null = null;
-  private roonTransport: RoonApiTransport | null = null;
-  private roonPaired = false;
+  public roonTransport: RoonApiTransport | null = null;
+  public roonPaired = false;
   private config: Config;
 
   constructor() {
@@ -100,8 +101,7 @@ export default class RoonDriver {
     let count = 0;
     this.config.forEachZone((zone) => {
       log.info(`Creating media-player for configured zone: ${zone.display_name} (${zone.zone_id})`);
-      const entity = newEntityFromZone(zone, true);
-      entity.setCmdHandler(this.handleEntityCommand.bind(this));
+      const entity = newEntityFromZone(zone, this, true);
       this.driver.addAvailableEntity(entity);
       count++;
     });
@@ -270,6 +270,7 @@ export default class RoonDriver {
       if (!zone.now_playing.image_key) {
         attr[uc.MediaPlayerAttributes.MediaImageUrl] = "";
       } else {
+        // TODO better just prepare the URL and let the UI download the image
         this.roonImage?.get_image(
           zone.now_playing.image_key,
           {
@@ -348,8 +349,7 @@ export default class RoonDriver {
           log.info(`Found available zone: ${zone.display_name} (${zone.zone_id})`);
           const res = this.driver.getAvailableEntities().getEntity(zone.zone_id);
           if (!res) {
-            const entity = newEntityFromZone(zone);
-            entity.setCmdHandler(this.handleEntityCommand.bind(this));
+            const entity = newEntityFromZone(zone, this);
             this.driver.addAvailableEntity(entity);
           }
           this.config.updateZone(zone);
@@ -359,168 +359,11 @@ export default class RoonDriver {
     });
   }
 
-  private async handleEntityCommand(
-    entity: uc.Entity,
-    command: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
-    if (!this.roonPaired) {
-      log.error(`Roon is not paired. Not executing command ${command}`);
-      this.setEntityState(entity.id, uc.MediaPlayerStates.Unavailable);
-      return uc.StatusCodes.ServiceUnavailable;
-    }
-
-    if (!this.roonTransport) {
-      log.error(`RoonTransport is not initialized. Not executing command ${command}`);
-      this.setEntityState(entity.id, uc.MediaPlayerStates.Unavailable);
-      return uc.StatusCodes.ServiceUnavailable;
-    }
-
-    log.info(`Command: ${command}`);
-
-    return new Promise((resolve) => {
-      switch (command) {
-        case uc.MediaPlayerCommands.PlayPause: {
-          const roonCmd =
-            entity?.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
-          this.roonTransport?.control(entity.id, roonCmd, async (error) => {
-            if (error) {
-              log.error(`Error on ${roonCmd} media player: ${error}`);
-              // TODO parse `error` and handle certain error conditions like `ZoneNotFound`
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        }
-        case uc.MediaPlayerCommands.Next:
-          this.roonTransport?.control(entity.id, "next", async (error) => {
-            if (error) {
-              log.error(`Error next media player: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        case uc.MediaPlayerCommands.Previous:
-          this.roonTransport?.control(entity.id, "previous", async (error) => {
-            if (error) {
-              log.error(`Error previous media player: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        case uc.MediaPlayerCommands.Volume: {
-          const output = this.getDefaultZoneOutput(entity.id);
-          if (output) {
-            this.roonTransport?.change_volume(output.output_id, "absolute", Number(params?.volume), async (error) => {
-              if (error) {
-                log.error(`Error changing volume media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.VolumeUp: {
-          const output = this.getDefaultZoneOutput(entity.id);
-          if (output) {
-            this.roonTransport?.change_volume(output.output_id, "relative_step", 1, async (error) => {
-              if (error) {
-                log.error(`Error changing volume media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          } else {
-            log.error(`Volume up, output not found, entity:${entity.id}`);
-            resolve(uc.StatusCodes.ServiceUnavailable);
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.VolumeDown: {
-          const output = this.getDefaultZoneOutput(entity.id);
-          if (output) {
-            this.roonTransport?.change_volume(output.output_id, "relative_step", -1, async (error) => {
-              if (error) {
-                log.error(`Error changing volume media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.MuteToggle: {
-          const output = this.getDefaultZoneOutput(entity.id);
-          if (output) {
-            const roonCmd = entity.attributes?.[uc.MediaPlayerAttributes.Muted] ? "unmute" : "mute";
-            this.roonTransport?.mute(output.output_id, roonCmd, async (error) => {
-              if (error) {
-                log.error(`Error on ${roonCmd} media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
-              } else {
-                resolve(uc.StatusCodes.Ok);
-              }
-            });
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.Seek:
-          this.roonTransport?.seek(entity.id, "absolute", Number(params?.media_position), async (error) => {
-            if (error) {
-              log.error(`Error seeking media player: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        case uc.MediaPlayerCommands.Shuffle: {
-          const shuffle = !!params?.shuffle;
-          this.roonTransport?.change_settings(entity.id, { shuffle }, async (error) => {
-            if (error) {
-              log.error(`Shuffle error: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        }
-        case uc.MediaPlayerCommands.Repeat: {
-          const repeat = params?.repeat?.toString();
-          const loop = getLoopMode(repeat);
-          this.roonTransport?.change_settings(entity.id, { loop }, async (error) => {
-            if (error) {
-              log.error(`Repeat error: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        }
-        default:
-          log.warn(`Unknown entity command: ${command}`);
-          resolve(uc.StatusCodes.BadRequest);
-      }
-    });
-  }
-
-  private getDefaultZoneOutput(zoneId: string) {
+  public getDefaultZoneOutput(zoneId: string): Output | undefined {
     return this.config.getZone(zoneId)?.outputs?.[0];
   }
 
-  private setEntityState(entityId: string, state: uc.MediaPlayerStates) {
+  public setEntityState(entityId: string, state: uc.MediaPlayerStates) {
     // ignore zone if it's not in our zone configuration
     if (!this.config.hasZone(entityId)) {
       return;

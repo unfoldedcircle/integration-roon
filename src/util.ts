@@ -8,7 +8,8 @@
 import fs from "fs";
 import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
-import type { LoopSetting, Zone } from "node-roon-api";
+import type { Zone } from "node-roon-api";
+import { type RoonDriver, RoonMediaPlayer } from "./media-player.js";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -40,6 +41,9 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
     case "stopped":
     case "paused":
       state = uc.MediaPlayerStates.Paused;
+      break;
+    case "loading":
+      state = uc.MediaPlayerStates.Buffering;
       break;
   }
   attr[uc.MediaPlayerAttributes.State] = state;
@@ -85,17 +89,6 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   return attr;
 };
 
-export function getLoopMode(repeat: string | undefined): LoopSetting {
-  switch (repeat) {
-    case uc.RepeatMode.All:
-      return "loop";
-    case uc.RepeatMode.One:
-      return "loop_one";
-    default:
-      return "disabled";
-  }
-}
-
 function getRepeatMode(zone: Zone): uc.RepeatMode {
   switch (zone.settings?.loop) {
     case "loop":
@@ -107,7 +100,7 @@ function getRepeatMode(zone: Zone): uc.RepeatMode {
   }
 }
 
-export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) {
+export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttributes: boolean = false) {
   const features = [
     uc.MediaPlayerFeatures.MuteToggle,
     uc.MediaPlayerFeatures.PlayPause,
@@ -121,7 +114,8 @@ export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) 
     uc.MediaPlayerFeatures.MediaAlbum,
     uc.MediaPlayerFeatures.MediaImageUrl,
     uc.MediaPlayerFeatures.Shuffle,
-    uc.MediaPlayerFeatures.Repeat
+    uc.MediaPlayerFeatures.Repeat,
+    uc.MediaPlayerFeatures.BrowseMedia
   ];
 
   // TODO add & test REPEAT, SHUFFLE
@@ -132,13 +126,14 @@ export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) 
   }
 
   const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
-  const entity = new uc.MediaPlayer(
+  const entity = new RoonMediaPlayer(
     zone.zone_id,
     { en: zone.display_name },
     {
       features,
       attributes
-    }
+    },
+    driver
   );
 
   return entity;
