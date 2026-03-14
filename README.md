@@ -16,7 +16,7 @@ Requirements:
 
 - Remote Two firmware 1.9.3 or newer with support for custom integrations.
 - Install [nvm](https://github.com/nvm-sh/nvm) (Node.js version manager) for local development.
-- Node.js v20.16 or newer (older versions are not tested).
+- Node.js v22.13 or newer (older versions are not tested).
 - Install required libraries:
 
 ```shell
