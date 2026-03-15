@@ -244,6 +244,8 @@ declare module "node-roon-api-browse" {
      * distinguish between them. Most applications will omit this field.
      */
     multi_session_key?: string;
+    item_key?: string;
+    zone_or_output_id?: string;
   }
 
   /**

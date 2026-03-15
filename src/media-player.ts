@@ -7,18 +7,21 @@
 
 import * as uc from "@unfoldedcircle/integration-api";
 import { KnownMediaClass, KnownMediaContentType } from "@unfoldedcircle/integration-api";
+import { type MediaContentType } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 
 import type { LoopSetting, Output } from "node-roon-api";
 import RoonApiTransport from "node-roon-api-transport";
-import type { BrowseService } from "./roon-browse.js";
 import type { Item, RoonApiBrowseHierarchy, RoonApiBrowseOptions } from "node-roon-api-browse";
+import type { BrowseService } from "./roon-browse.js";
+import { splitMediaPath } from "./util.js";
 
 const EXCLUDE_ITEMS = [
   "Play Album",
   "Play Artist",
   "Play Playlist",
   "Play Composer",
+  "Play Genre",
   "Play Now",
   "Play From Here",
   "Queue",
@@ -31,6 +34,8 @@ const EXCLUDE_ITEMS = [
   "Search Tidal",
   "Search Qobuz"
 ];
+
+const PAGE_SIZE = 100;
 
 /**
  * Interface for the Roon driver that the MediaPlayer needs to interact with.
@@ -243,6 +248,40 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           });
           break;
         }
+        case uc.MediaPlayerCommands.PlayMedia: {
+          const itemKey = params?.media_id as string;
+          const mediaType = params?.media_type as string;
+          const action = params?.action as string;
+          let playAction;
+
+          switch (action) {
+            case uc.MediaPlayAction.PlayNow: {
+              // use default action
+              break;
+            }
+            case uc.MediaPlayAction.PlayNext: {
+              playAction = "Add Next";
+              break;
+            }
+            case uc.MediaPlayAction.AddToQueue: {
+              playAction = "Queue";
+              break;
+            }
+            default:
+              log.warn(`Ignoring unsupported play action: ${action}`);
+              break;
+          }
+
+          if (mediaType === "library" || mediaType === "track") {
+            // media_id is a roon browser id
+            resolve(this.playItemById(itemKey));
+          } else {
+            // media_id is a path matching the Roon menu structure
+            const pathList = splitMediaPath(itemKey);
+            resolve(this.playItemByPath(pathList, playAction));
+          }
+          break;
+        }
         default:
           log.warn(`Unknown entity command: ${cmdId}`);
           resolve(uc.StatusCodes.BadRequest);
@@ -366,6 +405,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
 
         const mediaContentId = item.item_key || "";
+        // use a media type to indicate this is a native media id. If the client omits the media_type, the media_id is a path
+        let mediaContentType: MediaContentType = "library";
         const mediaClass = this.getMatchingMediaClass(item, displayTitle);
         let canBrowse = true;
 
@@ -375,6 +416,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         } else if (hint === "action_list") {
           canBrowse = false;
         } else if (hint === "action") {
+          mediaContentType = KnownMediaContentType.Track;
           canBrowse = false;
         } else {
           // Roon API says to treat unknown as a list
@@ -383,6 +425,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
 
         return new uc.BrowseMediaItem(mediaContentId, displayTitle, {
           media_class: mediaClass,
+          media_type: mediaContentType,
           can_play: true,
           can_browse: canBrowse,
           thumbnail
@@ -417,6 +460,357 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         return KnownMediaClass.Track;
       default:
         return KnownMediaClass.Directory;
+    }
+  }
+
+  /**
+   * Plays a media item by its unique identifier.
+   * This method interacts with the browse service to locate and initiate playback of the specified item.
+   *
+   * Logic from <https://github.com/pavoni/pyroon/blob/master/roonapi/roonapi.py>
+   *
+   * @param {string} mediaId - The unique identifier of the media item to play.
+   * @return {Promise<uc.StatusCodes>} A promise resolving to the status code of the playback operation.
+   * - `uc.StatusCodes.Ok` if playback is successfully initiated.
+   * - `uc.StatusCodes.BadRequest` if the requested ID is unsupported or invalid.
+   * - `uc.StatusCodes.ServiceUnavailable` if the browse service is not available.
+   * - `uc.StatusCodes.ServerError` if an unexpected error occurs during the operation.
+   */
+  async playItemById(mediaId: string): Promise<uc.StatusCodes> {
+    log.info(`Playing item by ID: ${mediaId}`);
+    try {
+      // Initial browse call
+      if (!this.roonDriver.browseService) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
+      let browseResult = await this.roonDriver.browseService.browse({
+        hierarchy: "browse",
+        item_key: mediaId,
+        zone_or_output_id: this.id
+      });
+
+      // For Radio the above load starts play - so catch this and return
+      if (browseResult?.list?.level === 0) {
+        log.info("Initial load started playback");
+        return uc.StatusCodes.Ok;
+      }
+
+      if (!browseResult) {
+        log.error(`Playback requested of unsupported id: ${mediaId}`);
+        return uc.StatusCodes.BadRequest;
+      }
+
+      // Load items at the current level
+      if (!this.roonDriver.browseService) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
+      let loadResult = await this.roonDriver.browseService.load({
+        hierarchy: "browse",
+        offset: 0,
+        count: 1
+      });
+
+      if (!loadResult.items || loadResult.items.length === 0) {
+        log.error(`No items found for id: ${mediaId}`);
+        return uc.StatusCodes.BadRequest;
+      }
+
+      let firstItem = loadResult.items[0];
+      if (!firstItem) {
+        log.error(`No items found for id: ${mediaId}`);
+        return uc.StatusCodes.BadRequest;
+      }
+      let hint = firstItem.hint;
+
+      if (hint !== "action" && hint !== "action_list") {
+        log.error(
+          `Playback requested but item is a list, not a playable action or action_list id: ${mediaId} (hint: ${hint})`
+        );
+        return uc.StatusCodes.BadRequest;
+      }
+
+      if (hint === "action_list") {
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        browseResult = await this.roonDriver.browseService.browse({
+          hierarchy: "browse",
+          item_key: firstItem.item_key,
+          zone_or_output_id: this.id
+        });
+
+        if (!browseResult) {
+          log.error(`Playback requested of unsupported id: ${mediaId}`);
+          return uc.StatusCodes.BadRequest;
+        }
+
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        loadResult = await this.roonDriver.browseService.load({
+          hierarchy: "browse",
+          offset: 0,
+          count: 1
+        });
+
+        firstItem = loadResult.items?.[0];
+        if (!firstItem) {
+          log.error(`No items found for id: ${mediaId}`);
+          return uc.StatusCodes.BadRequest;
+        }
+        hint = firstItem.hint;
+      }
+
+      if (hint !== "action") {
+        log.error(
+          `Playback requested but item does not have a playable action id: ${mediaId}, ${JSON.stringify(browseResult)}`
+        );
+        return uc.StatusCodes.BadRequest;
+      }
+
+      const playAction = loadResult.items[0];
+      if (!playAction) {
+        log.error(`No play action found for id: ${mediaId}`);
+        return uc.StatusCodes.BadRequest;
+      }
+      log.info(`'${playAction.title}' for '${JSON.stringify(browseResult)}'`);
+
+      if (!this.roonDriver.browseService) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
+      const execResult = await this.roonDriver.browseService.browse({
+        hierarchy: "browse",
+        item_key: playAction.item_key,
+        zone_or_output_id: this.id
+      });
+
+      if (!execResult) {
+        log.error(`Playback requested of unsupported id: ${mediaId}`);
+        return uc.StatusCodes.BadRequest;
+      }
+
+      return uc.StatusCodes.Ok;
+    } catch (e: unknown) {
+      log.error(`Error playing id ${mediaId}: ${e}`);
+      if (e instanceof Error) {
+        switch (e.message) {
+          case "ZoneNotFound":
+            return uc.StatusCodes.ServiceUnavailable;
+          case "InvalidItemKey":
+            return uc.StatusCodes.BadRequest;
+        }
+      }
+      return uc.StatusCodes.ServerError;
+    }
+  }
+
+  /**
+   * Play the media specified by a path.
+   *
+   * Logic from <https://github.com/pavoni/pyroon/blob/master/roonapi/roonapi.py>
+   *
+   * @param path A list allowing roon to find the media
+   *             e.g. ["Library", "Artists", "Neil Young", "Harvest"] or ["My Live Radio", "BBC Radio 4"]
+   * @param action The roon action to take to play the media - leave blank to choose the roon default
+   *               e.g. "Play Now", "Queue" or "Start Radio"
+   * @returns The status of the operation.
+   */
+  async playItemByPath(path: string[], action?: string): Promise<uc.StatusCodes> {
+    log.info(`Playing item by path: ${JSON.stringify(path)} (action: ${action ?? "default"})`);
+    try {
+      let totalCount = 0;
+      let browseOptions: RoonApiBrowseOptions = {
+        hierarchy: "browse",
+        pop_all: true,
+        zone_or_output_id: this.id
+      };
+
+      // Initial browse to get the root total count
+      if (!this.roonDriver.browseService) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
+      let browseResult = await this.roonDriver.browseService.browse(browseOptions);
+      if (browseResult.list) {
+        totalCount = browseResult.list.count;
+      }
+
+      let items: Item[] = [];
+
+      for (const element of path) {
+        let found: Item | undefined;
+        let searched = 0;
+
+        log.debug(`Looking for: ${element}`);
+
+        while (searched < totalCount && !found) {
+          if (!this.roonDriver.browseService) {
+            return uc.StatusCodes.ServiceUnavailable;
+          }
+          const loadResult = await this.roonDriver.browseService.load({
+            hierarchy: "browse",
+            offset: searched,
+            count: PAGE_SIZE
+          });
+
+          items = loadResult.items;
+          for (const item of items) {
+            searched++;
+            if (item.title === element) {
+              found = item;
+              break;
+            }
+          }
+
+          if (items.length === 0) {
+            break;
+          }
+        }
+
+        if (!found) {
+          log.error(`Could not find media path element '${element}' in ${items.map((i) => i.title).join(", ")}`);
+          return uc.StatusCodes.NotFound;
+        }
+
+        if (found.hint === "action") {
+          log.info(`Found action while traversing path: ${found.title}. Starting playback.`);
+          return uc.StatusCodes.Ok;
+        }
+
+        if (!found.item_key) {
+          log.error(`Found item '${element}' but it has no item_key`);
+          return uc.StatusCodes.BadRequest;
+        }
+
+        // Browse into the found item
+        browseOptions = {
+          hierarchy: "browse",
+          item_key: found.item_key,
+          zone_or_output_id: this.id
+        };
+
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        browseResult = await this.roonDriver.browseService.browse(browseOptions);
+        if (browseResult.list) {
+          totalCount = browseResult.list.count;
+        } else {
+          log.error(`Exception trying to play media: browse into '${element}' did not return a list`);
+          return uc.StatusCodes.ServerError;
+        }
+
+        // Load items for the next level
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        const loadResult = await this.roonDriver.browseService.load({
+          hierarchy: "browse",
+          offset: 0,
+          count: PAGE_SIZE
+        });
+        items = loadResult.items;
+      }
+
+      if (items.length === 0) {
+        log.error("No items found at the end of the path");
+        return uc.StatusCodes.NotFound;
+      }
+
+      const firstItem = items[0];
+      if (!firstItem) {
+        log.error("First item is unexpectedly undefined");
+        return uc.StatusCodes.ServerError;
+      }
+
+      // First item should be the action/action_list for playing this item (eg Play Genre, Play Artist, Play Album)
+      if (firstItem.hint !== "action_list" && firstItem.hint !== "action") {
+        log.error(
+          `Found media does not have playable action_list hint='${firstItem.hint}' '${items.map((i) => i.title).join(", ")}'`
+        );
+        return uc.StatusCodes.ServerError;
+      }
+
+      log.debug(`Found playable item: ${JSON.stringify(firstItem)}`);
+
+      const playHeader = firstItem.title;
+      if (firstItem.hint === "action_list") {
+        if (!firstItem.item_key) {
+          log.error(`Action list item '${firstItem.title}' has no item_key`);
+          return uc.StatusCodes.ServerError;
+        }
+
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        await this.roonDriver.browseService.browse({
+          hierarchy: "browse",
+          item_key: firstItem.item_key,
+          zone_or_output_id: this.id
+        });
+
+        if (!this.roonDriver.browseService) {
+          return uc.StatusCodes.ServiceUnavailable;
+        }
+        const loadResult = await this.roonDriver.browseService.load({
+          hierarchy: "browse",
+          offset: 0,
+          count: PAGE_SIZE
+        });
+        log.debug(`Playable item load result: ${JSON.stringify(loadResult)}`);
+        items = loadResult.items;
+      }
+
+      // We should now have play actions (eg Play Now, Add Next, Queue action, Start Radio)
+      log.debug(`Found ${items.length} play actions: ${JSON.stringify(items)}`);
+      let takeAction: Item | undefined;
+      if (!action) {
+        takeAction = items[0];
+      } else {
+        takeAction = items.find((item) => item.title === action);
+        if (!takeAction) {
+          log.error(`Could not find play action '${action}' in ${items.map((i) => i.title).join(", ")}`);
+          return uc.StatusCodes.NotFound;
+        }
+
+        if (!takeAction.hint) {
+          // pyroon logic:
+          //  I think this is a roon API error - when playing a tag - there should be a hint here!
+          //  so for now just ignore - and hope it's OK
+          log.debug(`No hint for action ${takeAction.title}`);
+        } else if (takeAction.hint !== "action") {
+          log.warn(`Found media does not have playable action ${takeAction.title} - ${takeAction.hint}`);
+          return uc.StatusCodes.NotFound;
+        }
+      }
+
+      if (!takeAction || !takeAction.item_key) {
+        log.error("No valid play action found");
+        return uc.StatusCodes.ServerError;
+      }
+
+      log.info(`Play action was '${playHeader}' / '${takeAction.title}'`);
+
+      if (!this.roonDriver.browseService) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
+      await this.roonDriver.browseService.browse({
+        hierarchy: "browse",
+        item_key: takeAction.item_key,
+        zone_or_output_id: this.id
+      });
+
+      return uc.StatusCodes.Ok;
+    } catch (e: unknown) {
+      log.error(`Error playing path ${JSON.stringify(path)}: ${e}`);
+      if (e instanceof Error) {
+        switch (e.message) {
+          case "ZoneNotFound":
+            return uc.StatusCodes.ServiceUnavailable;
+          case "InvalidItemKey":
+            return uc.StatusCodes.BadRequest;
+        }
+      }
+      return uc.StatusCodes.ServerError;
     }
   }
 }

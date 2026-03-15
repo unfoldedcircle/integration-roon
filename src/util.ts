@@ -115,7 +115,8 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     uc.MediaPlayerFeatures.MediaImageUrl,
     uc.MediaPlayerFeatures.Shuffle,
     uc.MediaPlayerFeatures.Repeat,
-    uc.MediaPlayerFeatures.BrowseMedia
+    uc.MediaPlayerFeatures.BrowseMedia,
+    uc.MediaPlayerFeatures.PlayMedia
   ];
 
   // TODO add & test REPEAT, SHUFFLE
@@ -137,4 +138,31 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
   );
 
   return entity;
+}
+
+/**
+ * Splits a media path string into an array of strings based on "/" as the delimiter,
+ * while respecting quoted substrings (double quotes).
+ *
+ * @param {string} path - The media path string to be split. Quoted sections are treated as single tokens.
+ * @return {string[]} An array of strings obtained by splitting the input path. Quoted sections remain intact.
+ */
+export function splitMediaPath(path: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < path.length; i++) {
+    const char = path[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "/" && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
 }
