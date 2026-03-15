@@ -10,10 +10,12 @@ import { AbortDriverSetup } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import RoonApi from "node-roon-api";
 import type { Core, Output, Zone } from "node-roon-api";
-import RoonApiImage from "node-roon-api-image";
+import RoonApiBrowse from "node-roon-api-browse";
+import RoonApiImage, { type RoonImageOptions } from "node-roon-api-image";
 import RoonApiStatus from "node-roon-api-status";
 import RoonApiTransport from "node-roon-api-transport";
 import type { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
+import { BrowseService } from "./roon-browse.js";
 import Config from "./config.js";
 import { convertImageToBase64, delay, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
 import type { RoonDriver as RoonDriverInterface } from "./media-player.js";
@@ -27,8 +29,15 @@ export default class RoonDriver implements RoonDriverInterface {
   private roonCore: Core | null = null;
   private roonImage: RoonApiImage | null = null;
   public roonTransport: RoonApiTransport | null = null;
+  public browseService: BrowseService | null = null;
   public roonPaired = false;
   private config: Config;
+  private static imageConfig: RoonImageOptions = {
+    scale: "fit",
+    width: 480,
+    height: 480,
+    format: "image/jpeg"
+  };
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -271,24 +280,15 @@ export default class RoonDriver implements RoonDriverInterface {
         attr[uc.MediaPlayerAttributes.MediaImageUrl] = "";
       } else {
         // TODO better just prepare the URL and let the UI download the image
-        this.roonImage?.get_image(
-          zone.now_playing.image_key,
-          {
-            scale: "fit",
-            width: 480,
-            height: 480,
-            format: "image/jpeg"
-          },
-          (error, _contentType, image) => {
-            if (error) {
-              log.warn(`Failed to get image: ${error}`);
-            } else if (image) {
-              this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, {
-                [uc.MediaPlayerAttributes.MediaImageUrl]: "data:image/png;base64," + image.toString("base64")
-              });
-            }
+        this.roonImage?.get_image(zone.now_playing.image_key, RoonDriver.imageConfig, (error, _contentType, image) => {
+          if (error) {
+            log.warn(`Failed to get image: ${error}`);
+          } else if (image) {
+            this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, {
+              [uc.MediaPlayerAttributes.MediaImageUrl]: "data:image/png;base64," + image.toString("base64")
+            });
           }
-        );
+        });
       }
     }
     return this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr);
@@ -299,6 +299,17 @@ export default class RoonDriver implements RoonDriverInterface {
     this.roonPaired = true;
     this.roonImage = new RoonApiImage(core);
     this.roonTransport = core.services.RoonApiTransport as RoonApiTransport;
+    const browseApi = core.services.RoonApiBrowse as RoonApiBrowse;
+
+    log.info("Got Roon services: %s", Object.keys(core.services).join(","));
+    // const transportApi = core.services["RoonApiTransport"];
+
+    this.browseService = new BrowseService(
+      browseApi,
+      RoonDriver.imageConfig,
+      this.roonCore.moo.transport.host,
+      +this.roonCore.moo.transport.port
+    );
 
     log.info(`Roon Core paired: ${core.core_id} ${core.display_name} ${core.display_version}`);
 
@@ -311,6 +322,7 @@ export default class RoonDriver implements RoonDriverInterface {
     this.roonCore = null;
     this.roonImage = null;
     this.roonTransport = null;
+    this.browseService = null;
     // #56 set all entities to unavailable if we are no longer paired with the Roon core
     // TODO enhance integration-library with helper functions to retrieve all entity IDs or update all entity states
     this.driver
@@ -375,7 +387,7 @@ export default class RoonDriver implements RoonDriverInterface {
 
   async init() {
     this.roon.init_services({
-      required_services: [RoonApiTransport, RoonApiImage],
+      required_services: [RoonApiTransport, RoonApiImage, RoonApiBrowse],
       provided_services: [this.roonApiStatus]
     });
     this.roonApiStatus.set_status("Disconnected", false);

@@ -1,7 +1,7 @@
 declare module "node-roon-api-image" {
   import { Core } from "node-roon-api";
 
-  interface RoonImageOptions {
+  export interface RoonImageOptions {
     /** If this is not set, the image will be returned at original size. Warning: that could be very large! */
     scale?: "fit" | "fill" | "stretch";
     /** The image width to be returned. Required if the scale property is set */

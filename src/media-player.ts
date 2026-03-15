@@ -6,10 +6,31 @@
  */
 
 import * as uc from "@unfoldedcircle/integration-api";
+import { KnownMediaClass, KnownMediaContentType } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 
 import type { LoopSetting, Output } from "node-roon-api";
 import RoonApiTransport from "node-roon-api-transport";
+import type { BrowseService } from "./roon-browse.js";
+import type { Item, RoonApiBrowseHierarchy, RoonApiBrowseOptions } from "node-roon-api-browse";
+
+const EXCLUDE_ITEMS = [
+  "Play Album",
+  "Play Artist",
+  "Play Playlist",
+  "Play Composer",
+  "Play Now",
+  "Play From Here",
+  "Queue",
+  "Start Radio",
+  "Add Next",
+  "Play Radio",
+  "Play Work",
+  "Settings",
+  "Search",
+  "Search Tidal",
+  "Search Qobuz"
+];
 
 /**
  * Interface for the Roon driver that the MediaPlayer needs to interact with.
@@ -18,6 +39,7 @@ import RoonApiTransport from "node-roon-api-transport";
 export interface RoonDriver {
   readonly roonPaired: boolean;
   readonly roonTransport: RoonApiTransport | null;
+  readonly browseService: BrowseService | null;
   getDefaultZoneOutput(zoneId: string): Output | undefined;
   setEntityState(entityId: string, state: uc.MediaPlayerStates): void;
 }
@@ -41,12 +63,12 @@ export function getLoopMode(repeat: string | undefined): LoopSetting {
 
 export class RoonMediaPlayer extends uc.MediaPlayer {
   constructor(
-    id: string,
+    zoneId: string,
     name: uc.EntityName,
     params: uc.MediaPlayerParams,
     private readonly roonDriver: RoonDriver
   ) {
-    super(id, name, params);
+    super(zoneId, name, params);
   }
 
   async command(cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -229,12 +251,172 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   }
 
   async browse(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    log.info(`TODO browse: ${JSON.stringify(options)}`);
-    return uc.StatusCodes.NotImplemented;
+    if (!this.roonDriver.browseService) {
+      log.warn(`Browse service not available`);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    log.debug(`browse: ${JSON.stringify(options)}`);
+
+    let contentId;
+    let browseOptions: RoonApiBrowseOptions;
+    if (!options.media_id) {
+      let hierarchy: RoonApiBrowseHierarchy = "browse";
+      switch (options.media_type) {
+        case KnownMediaContentType.Playlist:
+          hierarchy = "playlists";
+          break;
+        case KnownMediaContentType.Radio:
+          hierarchy = "internet_radio";
+          break;
+        case KnownMediaContentType.Album:
+          hierarchy = "albums";
+          break;
+        case KnownMediaContentType.Artist:
+          hierarchy = "artists";
+          break;
+        case KnownMediaContentType.Genre:
+          hierarchy = "genres";
+          break;
+        case KnownMediaContentType.Composer:
+          hierarchy = "composers";
+          break;
+      }
+      // Reset browse stack to root
+      browseOptions = {
+        hierarchy,
+        pop_all: true
+        // zone_or_output_id: this.id // zone is not required for browsing
+      };
+      contentId = "Explore";
+    } else {
+      browseOptions = {
+        hierarchy: "browse",
+        // multi_session_key: "roon_integration", // likely not required
+        item_key: options.media_id
+      };
+      contentId = options.media_id;
+    }
+    try {
+      const resultHeader = await this.roonDriver.browseService.browse(browseOptions);
+
+      if (resultHeader.action !== "list" || !resultHeader.list) {
+        throw new Error(`Unexpected response from root browse. Action: ${resultHeader.action}`);
+      }
+
+      log.info(`Browse result header: ${JSON.stringify(resultHeader)}`);
+
+      const header = resultHeader.list;
+      const totalCount = header.count;
+      let title = header.title;
+      const subtitle = header.subtitle;
+
+      if (subtitle) {
+        title = `${title} ${subtitle}`;
+      }
+
+      const loadResult = await this.roonDriver.browseService.load({
+        hierarchy: "browse",
+        offset: options.paging.offset,
+        count: options.paging.limit
+      });
+
+      log.info(`Browse result detail: ${JSON.stringify(loadResult)}`);
+
+      const children = this.convertItems(loadResult.items, resultHeader.list.image_key);
+      const browseItem = new uc.BrowseMediaItem(contentId, title, {
+        media_class: KnownMediaClass.Directory,
+        can_browse: children.length > 0,
+        thumbnail: resultHeader.list.image_key
+          ? this.roonDriver.browseService.buildImageUrl(resultHeader.list.image_key)
+          : undefined,
+        items: children
+      });
+
+      return uc.BrowseResult.fromPaging(browseItem, options.paging, totalCount);
+    } catch (e: unknown) {
+      log.error(`Error browsing: ${e}`);
+      if (e instanceof Error) {
+        switch (e.message) {
+          case "ZoneNotFound":
+            return uc.StatusCodes.ServiceUnavailable;
+          case "InvalidItemKey":
+            return uc.StatusCodes.BadRequest;
+        }
+      }
+      return uc.StatusCodes.ServerError;
+    }
   }
 
   async search(query: uc.SearchOptions): Promise<uc.StatusCodes | uc.SearchResult> {
     log.info(`TODO search: ${JSON.stringify(query)}`);
     return uc.StatusCodes.NotImplemented;
+  }
+
+  private convertItems(items: Item[], listImageId?: string): uc.BrowseMediaItem[] {
+    return items
+      .filter((item) => !EXCLUDE_ITEMS.includes(item.title))
+      .map((item) => {
+        const title = item.title;
+        const subtitle = item.subtitle;
+        const displayTitle = subtitle ? `${title} (${subtitle})` : title;
+
+        const imageId = item.image_key || listImageId;
+        const thumbnail =
+          imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
+
+        const mediaContentId = item.item_key || "";
+        const mediaClass = this.getMatchingMediaClass(item, displayTitle);
+        let canBrowse = true;
+
+        const hint = item.hint;
+        if (hint === "list") {
+          canBrowse = true;
+        } else if (hint === "action_list") {
+          canBrowse = false;
+        } else if (hint === "action") {
+          canBrowse = false;
+        } else {
+          // Roon API says to treat unknown as a list
+          log.warn(`Unknown hint ${title} - ${hint}`);
+        }
+
+        return new uc.BrowseMediaItem(mediaContentId, displayTitle, {
+          media_class: mediaClass,
+          can_play: true,
+          can_browse: canBrowse,
+          thumbnail
+        });
+      });
+  }
+
+  private getMatchingMediaClass(item: Item, displayTitle: string): uc.MediaClass {
+    switch (item.hint) {
+      case "list":
+        // oh well, if Roon's API only returns a bit more metadata. Parsing strings is not fun and might break any time...
+        switch (displayTitle) {
+          case "Playlists":
+            return KnownMediaClass.Playlist;
+          case "Artists":
+            return KnownMediaClass.Artist;
+          case "Albums":
+            return KnownMediaClass.Album;
+          case "Genres":
+            return KnownMediaClass.Genre;
+          case "Composers":
+            return KnownMediaClass.Composer;
+          case "My Live Radio":
+            return KnownMediaClass.Radio;
+          case "Tracks":
+            return KnownMediaClass.Track;
+        }
+        return KnownMediaClass.Directory;
+      case "action_list":
+        return KnownMediaClass.Playlist;
+      case "action":
+        return KnownMediaClass.Track;
+      default:
+        return KnownMediaClass.Directory;
+    }
   }
 }

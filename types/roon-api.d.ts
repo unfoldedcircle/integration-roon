@@ -146,7 +146,18 @@ declare module "node-roon-api" {
   }
   export type ResultCallback = (error: false | string, body?: any) => void;
 
+  export interface Transport {
+    host: string;
+    port: string;
+    is_alive?: boolean;
+  }
+
+  export interface Moo {
+    transport: Transport;
+  }
+
   export interface Core {
+    moo: Moo;
     core_id: string;
     display_name: string;
     display_version: string;
