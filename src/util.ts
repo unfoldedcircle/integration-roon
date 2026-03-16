@@ -116,7 +116,8 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     uc.MediaPlayerFeatures.Shuffle,
     uc.MediaPlayerFeatures.Repeat,
     uc.MediaPlayerFeatures.BrowseMedia,
-    uc.MediaPlayerFeatures.PlayMedia
+    uc.MediaPlayerFeatures.PlayMedia,
+    uc.MediaPlayerFeatures.SearchMedia
   ];
 
   // TODO add & test REPEAT, SHUFFLE
