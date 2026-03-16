@@ -74,7 +74,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     super(zoneId, name, params);
   }
 
-  async command(cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
+  async command(cmdId: string, params?: uc.EntityCommandParams): Promise<uc.StatusCodes> {
     if (!this.roonDriver.roonPaired) {
       log.error(`Roon is not paired. Not executing command ${cmdId}`);
       this.roonDriver.setEntityState(this.id, uc.MediaPlayerStates.Unavailable);
@@ -271,15 +271,15 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
 
             // best effort play action. Might work, or not with the mysterious Roon API
             switch (action) {
-              case uc.MediaPlayAction.PlayNow: {
+              case uc.KnownMediaPlayAction.PlayNow: {
                 // use default action
                 break;
               }
-              case uc.MediaPlayAction.PlayNext: {
+              case uc.KnownMediaPlayAction.PlayNext: {
                 playAction = "Add Next";
                 break;
               }
-              case uc.MediaPlayAction.AddToQueue: {
+              case uc.KnownMediaPlayAction.AddToQueue: {
                 playAction = "Queue";
                 break;
               }
@@ -425,10 +425,6 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     return items
       .filter((item) => !EXCLUDE_ITEMS.includes(item.title))
       .map((item) => {
-        const title = item.title;
-        const subtitle = item.subtitle;
-        const displayTitle = subtitle ? `${title} (${subtitle})` : title;
-
         const imageId = item.image_key || override?.listImageId;
         const thumbnail =
           imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
@@ -436,7 +432,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         const mediaContentId = item.item_key || "";
         // use a media type to indicate this is a native media id. If the client omits the media_type, the media_id is a path
         let mediaContentType: MediaContentType = "library";
-        const mediaClass = this.getMatchingMediaClass(item, displayTitle);
+        const mediaClass = this.getMatchingMediaClass(item);
         let canBrowse = true;
 
         const hint = item.hint;
@@ -449,7 +445,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           canBrowse = false;
         } else {
           // Roon API says to treat unknown as a list
-          log.warn(`Unknown hint ${title} - ${hint}`);
+          log.warn(`Unknown hint ${item.title} - ${hint}`);
         }
 
         // override media_type
@@ -457,7 +453,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           mediaContentType = override.mediaType;
         }
 
-        return new uc.BrowseMediaItem(mediaContentId, displayTitle, {
+        return new uc.BrowseMediaItem(mediaContentId, item.title, {
+          subtitle: item.subtitle,
           media_class: mediaClass,
           media_type: mediaContentType,
           can_play: true,
@@ -467,11 +464,11 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       });
   }
 
-  private getMatchingMediaClass(item: Item, displayTitle: string): uc.MediaClass {
+  private getMatchingMediaClass(item: Item): uc.MediaClass {
     switch (item.hint) {
       case "list":
         // oh well, if Roon's API only returns a bit more metadata. Parsing strings is not fun and might break any time...
-        switch (displayTitle) {
+        switch (item.title) {
           case "Playlists":
             return KnownMediaClass.Playlist;
           case "Artists":

@@ -26,7 +26,7 @@ export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
 };
 
 export const mediaPlayerAttributesFromZone = (zone: Zone) => {
-  const attr: { [key: string]: string | number | boolean } = {};
+  const attr: uc.EntityAttributes = {};
 
   if (!zone) {
     return attr;
@@ -86,6 +86,14 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   attr[uc.MediaPlayerAttributes.Shuffle] = !!zone.settings?.shuffle;
   attr[uc.MediaPlayerAttributes.Repeat] = getRepeatMode(zone);
 
+  // Note: play actions might not work for all media items. This requires further investigation.
+  // Maybe we can also add "Play From Here" and "Start Radio"
+  attr[uc.MediaPlayerAttributes.PlayMediaAction] = [
+    uc.KnownMediaPlayAction.PlayNow,
+    uc.KnownMediaPlayAction.PlayNext,
+    uc.KnownMediaPlayAction.AddToQueue
+  ];
+
   return attr;
 };
 
@@ -117,6 +125,7 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     uc.MediaPlayerFeatures.Repeat,
     uc.MediaPlayerFeatures.BrowseMedia,
     uc.MediaPlayerFeatures.PlayMedia,
+    uc.MediaPlayerFeatures.PlayMediaAction,
     uc.MediaPlayerFeatures.SearchMedia
   ];
 
