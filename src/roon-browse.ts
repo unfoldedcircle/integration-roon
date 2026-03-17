@@ -47,6 +47,108 @@ export class BrowseService {
     });
   }
 
+  /**
+   * Resolves a media key from a path.
+   *
+   * @param {string[]} path - The path to resolve. For example, ["Library", "Artists", "Pink Floyd"]
+   * @param {RoonApiBrowseHierarchy} hierarchy - The hierarchy to search in.
+   * @param {string} [zoneId] - Optional zone ID.
+   * @returns {Promise<string | StatusCodes>} - The resolved media key or a status code.
+   */
+  async resolveMediaKeyFromPath(
+    path: string[],
+    hierarchy: RoonApiBrowseHierarchy,
+    zoneId?: string
+  ): Promise<string | StatusCodes> {
+    try {
+      let totalCount = 0;
+      let browseOptions: RoonApiBrowseOptions = {
+        hierarchy,
+        pop_all: true,
+        zone_or_output_id: zoneId
+      };
+
+      let browseResult = await this.browse(browseOptions);
+      if (browseResult.list) {
+        totalCount = browseResult.list.count;
+      }
+
+      let items: Item[] = [];
+      let lastFoundItem: Item | undefined;
+
+      for (const element of path) {
+        let found: Item | undefined;
+        let searched = 0;
+
+        log.debug(`Looking for: ${element}`);
+
+        while (searched < totalCount && !found) {
+          const loadResult = await this.load({
+            hierarchy,
+            offset: searched,
+            count: PAGE_SIZE
+          });
+
+          items = loadResult.items;
+          for (const item of items) {
+            searched++;
+            if (item.title === element) {
+              found = item;
+              break;
+            }
+          }
+
+          if (items.length === 0) {
+            break;
+          }
+        }
+
+        if (!found) {
+          log.error(`Could not find media path element '${element}' in ${items.map((i) => i.title).join(", ")}`);
+          return StatusCodes.NotFound;
+        }
+
+        lastFoundItem = found;
+
+        if (found.hint === "action") {
+          // If we found an action while traversing the path, we can't browse further.
+          // In the context of playItemByPath, this is already a success.
+          log.info(`Found action while traversing path: ${found.title}.`);
+          return found.item_key || StatusCodes.Ok;
+        }
+
+        if (!found.item_key) {
+          log.error(`Found item '${element}' but it has no item_key`);
+          return StatusCodes.ServerError;
+        }
+
+        // Browse into the found item
+        browseOptions = {
+          hierarchy,
+          item_key: found.item_key,
+          zone_or_output_id: zoneId
+        };
+
+        browseResult = await this.browse(browseOptions);
+        if (browseResult.list) {
+          totalCount = browseResult.list.count;
+        } else {
+          log.error(`Exception trying to resolve media path: browse into '${element}' did not return a list`);
+          return StatusCodes.ServerError;
+        }
+      }
+
+      if (!lastFoundItem?.item_key) {
+        return StatusCodes.NotFound;
+      }
+
+      return lastFoundItem.item_key;
+    } catch (e) {
+      log.error(`Error resolving path ${JSON.stringify(path)}: ${e}`);
+      return StatusCodes.ServerError;
+    }
+  }
+
   buildImageUrl(imageKey: string): string {
     const { width, height, scale, format } = this.imageConfig;
     return `http://${this.coreIp}:${this.roonPort}/api/image/${imageKey}?scale=${scale}&width=${width}&height=${height}&format=${encodeURIComponent(format || "image/jpeg")}`;
@@ -205,86 +307,31 @@ export class BrowseService {
   async playItemByPath(zoneId: string, path: string[], action?: string): Promise<StatusCodes> {
     log.info(`Playing item by path: ${JSON.stringify(path)} (action: ${action ?? "default"})`);
     try {
-      let totalCount = 0;
-      let browseOptions: RoonApiBrowseOptions = {
-        hierarchy: "browse",
-        pop_all: true,
+      const hierarchy = "browse";
+      const resolved = await this.resolveMediaKeyFromPath(path, hierarchy, zoneId);
+
+      if (typeof resolved !== "string") {
+        return resolved;
+      }
+
+      const browseResult = await this.browse({
+        hierarchy,
+        item_key: resolved,
         zone_or_output_id: zoneId
-      };
+      });
 
-      // Initial browse to get the root total count
-      let browseResult = await this.browse(browseOptions);
-      if (browseResult.list) {
-        totalCount = browseResult.list.count;
+      if (!browseResult.list) {
+        log.error("Exception trying to play media: browse into resolved item did not return a list");
+        return StatusCodes.ServerError;
       }
 
-      let items: Item[] = [];
-
-      for (const element of path) {
-        let found: Item | undefined;
-        let searched = 0;
-
-        log.debug(`Looking for: ${element}`);
-
-        while (searched < totalCount && !found) {
-          const loadResult = await this.load({
-            hierarchy: "browse",
-            offset: searched,
-            count: PAGE_SIZE
-          });
-
-          items = loadResult.items;
-          for (const item of items) {
-            searched++;
-            if (item.title === element) {
-              found = item;
-              break;
-            }
-          }
-
-          if (items.length === 0) {
-            break;
-          }
-        }
-
-        if (!found) {
-          log.error(`Could not find media path element '${element}' in ${items.map((i) => i.title).join(", ")}`);
-          return StatusCodes.NotFound;
-        }
-
-        if (found.hint === "action") {
-          log.info(`Found action while traversing path: ${found.title}. Starting playback.`);
-          return StatusCodes.Ok;
-        }
-
-        if (!found.item_key) {
-          log.error(`Found item '${element}' but it has no item_key`);
-          return StatusCodes.ServerError;
-        }
-
-        // Browse into the found item
-        browseOptions = {
-          hierarchy: "browse",
-          item_key: found.item_key,
-          zone_or_output_id: zoneId
-        };
-
-        browseResult = await this.browse(browseOptions);
-        if (browseResult.list) {
-          totalCount = browseResult.list.count;
-        } else {
-          log.error(`Exception trying to play media: browse into '${element}' did not return a list`);
-          return StatusCodes.ServerError;
-        }
-
-        // Load items for the next level
-        const loadResult = await this.load({
-          hierarchy: "browse",
-          offset: 0,
-          count: PAGE_SIZE
-        });
-        items = loadResult.items;
-      }
+      // Load items for the resolved level
+      const loadResult = await this.load({
+        hierarchy,
+        offset: 0,
+        count: PAGE_SIZE
+      });
+      let items = loadResult.items;
 
       if (items.length === 0) {
         log.error("No items found at the end of the path");
@@ -315,13 +362,13 @@ export class BrowseService {
         }
 
         await this.browse({
-          hierarchy: "browse",
+          hierarchy,
           item_key: firstItem.item_key,
           zone_or_output_id: zoneId
         });
 
         const loadResult = await this.load({
-          hierarchy: "browse",
+          hierarchy,
           offset: 0,
           count: PAGE_SIZE
         });
@@ -360,7 +407,7 @@ export class BrowseService {
       log.info(`Play action was '${playHeader}' / '${takeAction.title}'`);
 
       await this.browse({
-        hierarchy: "browse",
+        hierarchy,
         item_key: takeAction.item_key,
         zone_or_output_id: zoneId
       });
@@ -404,10 +451,11 @@ export class BrowseService {
     } = { mode: "hierarchy" }
   ): Promise<Item[] | number> {
     if (options.mode === "hierarchy") {
+      const hierarchy = "search";
       log.info(`Hierarchy search: ${query}`);
       // Start a fresh search session
       const response = await this.browse({
-        hierarchy: "search",
+        hierarchy,
         zone_or_output_id: options.zoneId,
         pop_all: true,
         input: query
@@ -421,7 +469,7 @@ export class BrowseService {
 
       // Load top‑level search results
       const loadResponse = await this.load({
-        hierarchy: "search",
+        hierarchy,
         level: 0,
         offset,
         count
@@ -436,8 +484,9 @@ export class BrowseService {
       return loadResponse.items;
     } else {
       // alternative search if hierarchy search is not enough: NOT TESTED
+      const hierarchy = "browse";
       const response = await this.browse({
-        hierarchy: "browse",
+        hierarchy,
         zone_or_output_id: options.zoneId,
         item_key: options.itemKey,
         input: query
@@ -448,9 +497,9 @@ export class BrowseService {
       }
 
       const loadResponse = await this.load({
-        hierarchy: "browse",
-        offset: 0,
-        count: 50
+        hierarchy,
+        offset,
+        count
       });
 
       loadResponse.items.forEach((item: Item) => {

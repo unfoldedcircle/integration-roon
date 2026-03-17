@@ -15,7 +15,7 @@ _Changes in the next release_
 
 ### Changed
 
-- Use new integration-library version 0.4.0.
+- Use new integration-library version 0.4.1.
 - Move media-player command handler to RoonMediaPlayer class.
 - Replace WebSocket image retrieval with http url endpoint.
 - Update dependencies.

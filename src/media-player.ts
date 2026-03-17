@@ -299,90 +299,6 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     });
   }
 
-  async browse(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    if (!this.roonDriver.browseService) {
-      log.warn(`Browse service not available`);
-      return uc.StatusCodes.ServiceUnavailable;
-    }
-
-    log.debug(`browse: ${JSON.stringify(options)}`);
-
-    let contentId;
-    let browseOptions: RoonApiBrowseOptions;
-
-    // Roon quirk: a media_id returned from a search requires matching hierarchy.
-    const hierarchy: RoonApiBrowseHierarchy = options.media_type === "search" ? "search" : "browse";
-
-    if (!options.media_id) {
-      // Reset browse stack to root
-      browseOptions = {
-        hierarchy,
-        pop_all: true
-        // zone_or_output_id: this.id // zone is not required for browsing
-      };
-      contentId = "Explore";
-    } else {
-      browseOptions = {
-        hierarchy,
-        item_key: options.media_id
-      };
-      contentId = options.media_id;
-    }
-    try {
-      const resultHeader = await this.roonDriver.browseService.browse(browseOptions);
-
-      if (resultHeader.action !== "list" || !resultHeader.list) {
-        throw new Error(`Unexpected response from root browse. Action: ${resultHeader.action}`);
-      }
-
-      log.info(`Browse result header: ${JSON.stringify(resultHeader)}`);
-
-      const header = resultHeader.list;
-      const totalCount = header.count;
-      let title = header.title;
-      const subtitle = header.subtitle;
-
-      if (subtitle) {
-        title = `${title} ${subtitle}`;
-      }
-
-      const loadResult = await this.roonDriver.browseService.load({
-        hierarchy,
-        offset: options.paging.offset,
-        count: options.paging.limit
-      });
-
-      log.info(`Browse result detail: ${JSON.stringify(loadResult)}`);
-
-      const children = this.convertItems(loadResult.items, {
-        listImageId: resultHeader.list.image_key,
-        // The search hierarchy key has to be propagated, otherwise the result items can't be used for play or browse actions!
-        mediaType: hierarchy === "search" ? "search" : undefined
-      });
-      const browseItem = new uc.BrowseMediaItem(contentId, title, {
-        media_class: KnownMediaClass.Directory,
-        can_browse: children.length > 0,
-        thumbnail: resultHeader.list.image_key
-          ? this.roonDriver.browseService.buildImageUrl(resultHeader.list.image_key)
-          : undefined,
-        items: children
-      });
-
-      return uc.BrowseResult.fromPaging(browseItem, options.paging, totalCount);
-    } catch (e: unknown) {
-      log.error(`Error browsing: ${e}`);
-      if (e instanceof Error) {
-        switch (e.message) {
-          case "ZoneNotFound":
-            return uc.StatusCodes.ServiceUnavailable;
-          case "InvalidItemKey":
-            return uc.StatusCodes.BadRequest;
-        }
-      }
-      return uc.StatusCodes.ServerError;
-    }
-  }
-
   async search(search: uc.SearchOptions): Promise<uc.StatusCodes | uc.SearchResult> {
     log.info(`Media search: ${JSON.stringify(search)}`);
     try {
@@ -405,6 +321,177 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       const items = this.convertItems(result, { mediaType: "search" });
       return new SearchResult(items, new uc.Pagination(search.paging.page, search.paging.limit));
     } catch (e: unknown) {
+      log.error(`Error searching: ${e}`);
+      if (e instanceof Error) {
+        switch (e.message) {
+          case "ZoneNotFound":
+            return uc.StatusCodes.ServiceUnavailable;
+          case "InvalidItemKey":
+            return uc.StatusCodes.BadRequest;
+        }
+      }
+      return uc.StatusCodes.ServerError;
+    }
+  }
+
+  async browse(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+    log.debug(`browse: ${JSON.stringify(options)}`);
+
+    if (options.stable_ids === true) {
+      return await this.browseByPath(options);
+    } else {
+      return await this.browseByItemKey(options);
+    }
+  }
+
+  /**
+   * Browse with the native Roon media key. This is the preferred way to browse Roon media.
+   *
+   * - The `media_id` is the native Roon media key.
+   * - The `media_type` is a hint for the Roon hierarchy to use:
+   *   - `search`: for the `search` hierarchy, e.g., browsing from a search result.
+   *   - all other values: use `browse` hierarchy.
+   */
+  private async browseByItemKey(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+    if (!this.roonDriver.browseService) {
+      log.warn(`Browse service not available`);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    let contentId;
+    let browseOptions: RoonApiBrowseOptions;
+
+    // Roon quirk: a media_id returned from a search requires matching hierarchy.
+    // We only have two entry points for now: media browsing and searching.
+    // Note: we also store other special media types in `media_type`, not only RoonApiBrowseHierarchy values!
+    const hierarchy: RoonApiBrowseHierarchy = options.media_type === "search" ? "search" : "browse";
+    const mediaTypeOverride = hierarchy === "search" ? "search" : undefined;
+
+    if (!options.media_id) {
+      // Reset browse stack to root
+      browseOptions = {
+        hierarchy,
+        pop_all: true
+        // zone_or_output_id: this.id // zone is not required for browsing
+      };
+      contentId = "Explore"; // same as root title
+    } else {
+      browseOptions = {
+        hierarchy,
+        item_key: options.media_id
+      };
+      contentId = options.media_id;
+    }
+
+    return this.executeBrowse(options, browseOptions, contentId, mediaTypeOverride);
+  }
+
+  /**
+   * Browse with a path-based media key.
+   *
+   * This is a workaround to get stable media item identifiers for playback.
+   * For example, mapping UI buttons to favorite albums, playlists, etc.
+   *
+   * Attention: this may lead to non-unique media IDs! The first match is used.
+   *
+   * - The `media_id` contains the media path. Each Roon level is represented by its title, levels separated by /
+   * - The `media_type` is set to `path`.
+   */
+  private async browseByPath(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+    if (!this.roonDriver.browseService) {
+      log.warn(`Browse service not available`);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    let browseOptions: RoonApiBrowseOptions;
+    const hierarchy = "browse";
+    const mediaTypeOverride = "path";
+
+    if (!options.media_id) {
+      // Reset browse stack to root
+      browseOptions = {
+        hierarchy,
+        pop_all: true
+        // zone_or_output_id: this.id // zone is not required for browsing
+      };
+      options.media_id = ""; // empty path means root
+    } else {
+      const path = splitMediaPath(options.media_id);
+      const resolved = await this.roonDriver.browseService.resolveMediaKeyFromPath(path, hierarchy);
+      if (typeof resolved !== "string") {
+        return resolved;
+      }
+      browseOptions = {
+        hierarchy,
+        item_key: resolved
+      };
+    }
+
+    return this.executeBrowse(options, browseOptions, options.media_id, mediaTypeOverride, options.media_id);
+  }
+
+  /**
+   * Internal helper to execute a browse and load command.
+   *
+   * @param options UC browse options.
+   * @param browseOptions Roon browse options.
+   * @param contentId The content ID for the resulting browse item.
+   * @param mediaType Optional media type override.
+   * @param mediaPath Optional media path for path-based browsing.
+   * @returns A browse result or an error status code.
+   */
+  private async executeBrowse(
+    options: uc.BrowseOptions,
+    browseOptions: RoonApiBrowseOptions,
+    contentId: string,
+    mediaType?: MediaContentType,
+    mediaPath?: string
+  ): Promise<uc.StatusCodes | uc.BrowseResult> {
+    if (!this.roonDriver.browseService) {
+      log.warn(`Browse service not available`);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    const hierarchy = browseOptions.hierarchy;
+    const browseService = this.roonDriver.browseService;
+
+    try {
+      const resultHeader = await browseService.browse(browseOptions);
+
+      if (resultHeader.action !== "list" || !resultHeader.list) {
+        throw new Error(`Unexpected response from root browse. Action: ${resultHeader.action}`);
+      }
+
+      log.debug(`Browse result header: ${JSON.stringify(resultHeader)}`);
+
+      const header = resultHeader.list;
+      const totalCount = header.count;
+      const title = header.title;
+
+      const loadResult = await browseService.load({
+        hierarchy,
+        offset: options.paging.offset,
+        count: options.paging.limit
+      });
+
+      log.debug(`Browse result detail: ${JSON.stringify(loadResult)}`);
+
+      const children = this.convertItems(loadResult.items, {
+        listImageId: resultHeader.list.image_key,
+        mediaType,
+        mediaPath
+      });
+      const browseItem = new uc.BrowseMediaItem(contentId, title, {
+        subtitle: header.subtitle,
+        media_class: KnownMediaClass.Directory,
+        media_type: mediaType,
+        can_browse: children.length > 0,
+        thumbnail: resultHeader.list.image_key ? browseService.buildImageUrl(resultHeader.list.image_key) : undefined,
+        items: children
+      });
+
+      return uc.BrowseResult.fromPaging(browseItem, options.paging, totalCount);
+    } catch (e: unknown) {
       log.error(`Error browsing: ${e}`);
       if (e instanceof Error) {
         switch (e.message) {
@@ -418,9 +505,12 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     }
   }
 
+  /**
+   * Map Roon items to UC media items.
+   */
   private convertItems(
     items: Item[],
-    override?: { listImageId?: string; mediaType?: MediaContentType }
+    override?: { listImageId?: string; mediaType?: MediaContentType; mediaPath?: string }
   ): uc.BrowseMediaItem[] {
     return items
       .filter((item) => !EXCLUDE_ITEMS.includes(item.title))
@@ -429,7 +519,10 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         const thumbnail =
           imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
 
-        const mediaContentId = item.item_key || "";
+        const mediaContentId =
+          typeof override?.mediaPath === "string"
+            ? this.createMediaPath(override.mediaPath, item.title)
+            : item.item_key || "";
         // use a media type to indicate this is a native media id. If the client omits the media_type, the media_id is a path
         let mediaContentType: MediaContentType = "library";
         const mediaClass = this.getMatchingMediaClass(item);
@@ -462,6 +555,12 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           thumbnail
         });
       });
+  }
+
+  private createMediaPath(rootPath: string, title: string): string {
+    const escape = title.includes("/") ? '"' : "";
+    const root = rootPath ? `${rootPath}/` : "";
+    return `${root}${escape}${title}${escape}`;
   }
 
   private getMatchingMediaClass(item: Item): uc.MediaClass {

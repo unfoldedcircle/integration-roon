@@ -313,15 +313,11 @@ export default class RoonDriver implements RoonDriverInterface {
     this.roonTransport = null;
     this.browseService = null;
     // #56 set all entities to unavailable if we are no longer paired with the Roon core
-    // TODO enhance integration-library with helper functions to retrieve all entity IDs or update all entity states
     this.driver
       .getConfiguredEntities()
-      .getEntities()
-      .forEach((entity) => {
-        const entityId = entity.id as string;
-        if (entityId) {
-          this.setEntityState(entityId, uc.MediaPlayerStates.Unavailable);
-        }
+      .getIds()
+      .forEach((entityId) => {
+        this.setEntityState(entityId, uc.MediaPlayerStates.Unavailable);
       });
   }
 

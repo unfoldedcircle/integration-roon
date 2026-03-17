@@ -154,6 +154,8 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
  * Splits a media path string into an array of strings based on "/" as the delimiter,
  * while respecting quoted substrings (double quotes).
  *
+ * Leading and trailing slashes are removed from the path.
+ *
  * @param {string} path - The media path string to be split. Quoted sections are treated as single tokens.
  * @return {string[]} An array of strings obtained by splitting the input path. Quoted sections remain intact.
  */
@@ -161,6 +163,13 @@ export function splitMediaPath(path: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
+
+  if (path.startsWith("/")) {
+    path = path.substring(1);
+  }
+  if (path.endsWith("/")) {
+    path = path.substring(0, path.length - 1);
+  }
 
   for (let i = 0; i < path.length; i++) {
     const char = path[i];
