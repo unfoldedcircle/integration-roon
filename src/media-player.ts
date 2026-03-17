@@ -300,7 +300,16 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   }
 
   async search(search: uc.SearchOptions): Promise<uc.StatusCodes | uc.SearchResult> {
-    log.info(`Media search: ${JSON.stringify(search)}`);
+    log.debug(`Media search: ${JSON.stringify(search)}`);
+
+    // Roon searching is a PITA. Anyone know how to get an item path back?
+    if (search.stable_ids === true) {
+      log.warn(`Stable IDs are not supported for media search`);
+    }
+    if (search.media_id || search.media_type) {
+      log.warn(`Media ID and type are not supported for media search`);
+    }
+
     try {
       if (!this.roonDriver.browseService) {
         return uc.StatusCodes.ServiceUnavailable;

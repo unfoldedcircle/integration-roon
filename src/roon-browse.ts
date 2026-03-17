@@ -13,8 +13,6 @@ import log from "./loggers.js";
 
 const PAGE_SIZE = 100;
 
-export type SearchMode = "hierarchy" | "browse";
-
 export class BrowseService {
   constructor(
     private browseApi: RoonApiBrowse,
@@ -428,16 +426,13 @@ export class BrowseService {
   }
 
   /**
-   * Performs a full-text search based on the given query and parameters. The search can be executed
-   * in different modes, such as "hierarchy" or "browse," depending on the use case and provided options.
+   * Performs a full-text search based on the given query and parameters.
    *
    * @param {string} query - The search string to query.
    * @param {number} offset - The offset for pagination purposes, specifying the starting index of results. 0-based.
    * @param {number} count - The number of items to retrieve for each search.
    * @param {Object} options - Additional options to customize the search behavior.
    * @param {string} [options.zoneId] - Optional zone or output ID to refine the search.
-   * @param {string} [options.itemKey] - Optional key to specify an item when using the `browse` search mode.
-   * @param {SearchMode} options.mode - The mode of the search: `hierarchy` for a hierarchical search, `browse` for a browse search.
    * @return {Promise<Item[] | number>} A promise that resolves to an array of search result items, or a status code indicating an error.
    */
   async fullTextSearch(
@@ -446,67 +441,38 @@ export class BrowseService {
     count: number,
     options: {
       zoneId?: string;
-      itemKey?: string;
-      mode: SearchMode;
-    } = { mode: "hierarchy" }
+    } = {}
   ): Promise<Item[] | number> {
-    if (options.mode === "hierarchy") {
-      const hierarchy = "search";
-      log.info(`Hierarchy search: ${query}`);
-      // Start a fresh search session
-      const response = await this.browse({
-        hierarchy,
-        zone_or_output_id: options.zoneId,
-        pop_all: true,
-        input: query
-      });
+    const hierarchy = "search";
+    log.info(`Hierarchy search: ${query}`);
+    // Start a fresh search session
+    const response = await this.browse({
+      hierarchy,
+      zone_or_output_id: options.zoneId,
+      pop_all: true,
+      input: query
+    });
 
-      // For a successful search, Roon responds with action "list"
-      if (response.action !== "list") {
-        log.warn("Unexpected search action:", response.action);
-        return StatusCodes.ServerError;
-      }
-
-      // Load top‑level search results
-      const loadResponse = await this.load({
-        hierarchy,
-        level: 0,
-        offset,
-        count
-      });
-
-      // Depending on Roon version, you may see sections like:
-      // "Top Result", "Artists", "Albums", "Tracks", etc.
-      loadResponse.items.forEach((item: Item) => {
-        log.debug(item.title, item.subtitle, item.hint);
-      });
-
-      return loadResponse.items;
-    } else {
-      // alternative search if hierarchy search is not enough: NOT TESTED
-      const hierarchy = "browse";
-      const response = await this.browse({
-        hierarchy,
-        zone_or_output_id: options.zoneId,
-        item_key: options.itemKey,
-        input: query
-      });
-      if (response.action !== "list") {
-        log.warn("Unexpected action from search:", response.action);
-        return StatusCodes.ServerError;
-      }
-
-      const loadResponse = await this.load({
-        hierarchy,
-        offset,
-        count
-      });
-
-      loadResponse.items.forEach((item: Item) => {
-        log.debug(item.title, item.subtitle, item.hint);
-      });
-
-      return loadResponse.items;
+    // For a successful search, Roon responds with action "list"
+    if (response.action !== "list") {
+      log.warn("Unexpected search action:", response.action);
+      return StatusCodes.ServerError;
     }
+
+    // Load top‑level search results
+    const loadResponse = await this.load({
+      hierarchy,
+      level: 0,
+      offset,
+      count
+    });
+
+    // Depending on Roon version, you may see sections like:
+    // "Top Result", "Artists", "Albums", "Tracks", etc.
+    loadResponse.items.forEach((item: Item) => {
+      log.debug(item.title, item.subtitle, item.hint);
+    });
+
+    return loadResponse.items;
   }
 }
