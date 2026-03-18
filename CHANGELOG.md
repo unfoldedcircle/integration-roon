@@ -9,18 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.5.0 - 2026-03-18
+
 ### Added
 
-- Support media browsing, searching and playback of media from Roon.
+- Support media browsing, searching and playback of media from Roon ([#65](https://github.com/unfoldedcircle/integration-roon/pull/65)).
+
+### Fixed
+
+- Volume control for different volume types ([#66](https://github.com/unfoldedcircle/integration-roon/pull/66)).
 
 ### Changed
 
 - Use new integration-library version 0.4.1.
 - Move media-player command handler to RoonMediaPlayer class.
 - Replace WebSocket image retrieval with http url endpoint.
-- Update dependencies.
-
----
+- Update dependencies and GitHub actions ([#63](https://github.com/unfoldedcircle/integration-roon/pull/63), [#64](https://github.com/unfoldedcircle/integration-roon/pull/64)).
 
 ## 0.4.1 - 2025-05-14
 
