@@ -8,6 +8,7 @@
 import fs from "fs";
 import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
+import { StatusCodes } from "@unfoldedcircle/integration-api";
 import type { Zone } from "node-roon-api";
 import { type RoonDriver, RoonMediaPlayer } from "./media-player.js";
 
@@ -184,4 +185,23 @@ export function splitMediaPath(path: string): string[] {
   }
   result.push(current);
   return result;
+}
+
+/**
+ * Maps a Roon error (either an Error object or a string) to a UC StatusCodes.
+ *
+ * @param {unknown} e - The error to map.
+ * @returns {StatusCodes} The corresponding UC status code.
+ */
+export function mapRoonErrorToStatusCode(e: unknown): StatusCodes {
+  const message = e instanceof Error ? e.message : String(e);
+
+  switch (message) {
+    case "ZoneNotFound":
+      return StatusCodes.ServiceUnavailable;
+    case "InvalidItemKey":
+      return StatusCodes.BadRequest;
+    default:
+      return StatusCodes.ServerError;
+  }
 }

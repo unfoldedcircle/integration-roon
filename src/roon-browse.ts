@@ -10,6 +10,7 @@ import type {
 import type { RoonImageOptions } from "node-roon-api-image";
 import { StatusCodes } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
+import { mapRoonErrorToStatusCode } from "./util.js";
 
 const PAGE_SIZE = 100;
 
@@ -141,9 +142,9 @@ export class BrowseService {
       }
 
       return lastFoundItem.item_key;
-    } catch (e) {
+    } catch (e: unknown) {
       log.error(`Error resolving path ${JSON.stringify(path)}: ${e}`);
-      return StatusCodes.ServerError;
+      return mapRoonErrorToStatusCode(e);
     }
   }
 
@@ -273,15 +274,7 @@ export class BrowseService {
       return StatusCodes.Ok;
     } catch (e: unknown) {
       log.error(`Error playing id ${mediaId}: ${e}`);
-      if (e instanceof Error) {
-        switch (e.message) {
-          case "ZoneNotFound":
-            return StatusCodes.ServiceUnavailable;
-          case "InvalidItemKey":
-            return StatusCodes.BadRequest;
-        }
-      }
-      return StatusCodes.ServerError;
+      return mapRoonErrorToStatusCode(e);
     }
   }
 
@@ -413,15 +406,7 @@ export class BrowseService {
       return StatusCodes.Ok;
     } catch (e: unknown) {
       log.error(`Error playing path ${JSON.stringify(path)}: ${e}`);
-      if (e instanceof Error) {
-        switch (e.message) {
-          case "ZoneNotFound":
-            return StatusCodes.ServiceUnavailable;
-          case "InvalidItemKey":
-            return StatusCodes.BadRequest;
-        }
-      }
-      return StatusCodes.ServerError;
+      return mapRoonErrorToStatusCode(e);
     }
   }
 

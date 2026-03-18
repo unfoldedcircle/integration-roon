@@ -14,7 +14,7 @@ import type { LoopSetting, Output } from "node-roon-api";
 import RoonApiTransport from "node-roon-api-transport";
 import type { Item, RoonApiBrowseHierarchy, RoonApiBrowseOptions } from "node-roon-api-browse";
 import type { BrowseService } from "./roon-browse.js";
-import { splitMediaPath } from "./util.js";
+import { mapRoonErrorToStatusCode, splitMediaPath } from "./util.js";
 
 const EXCLUDE_ITEMS = [
   "Play Album",
@@ -97,8 +97,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           this.roonDriver.roonTransport?.control(this.id, roonCmd, (error: string | false) => {
             if (error) {
               log.error(`Error on ${roonCmd} media player: ${error}`);
-              // TODO parse `error` and handle certain error conditions like `ZoneNotFound`
-              resolve(uc.StatusCodes.ServerError);
+              resolve(mapRoonErrorToStatusCode(error));
             } else {
               resolve(uc.StatusCodes.Ok);
             }
@@ -109,7 +108,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           this.roonDriver.roonTransport?.control(this.id, "next", (error: string | false) => {
             if (error) {
               log.error(`Error next media player: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
+              resolve(mapRoonErrorToStatusCode(error));
             } else {
               resolve(uc.StatusCodes.Ok);
             }
@@ -119,7 +118,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           this.roonDriver.roonTransport?.control(this.id, "previous", (error: string | false) => {
             if (error) {
               log.error(`Error previous media player: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
+              resolve(mapRoonErrorToStatusCode(error));
             } else {
               resolve(uc.StatusCodes.Ok);
             }
@@ -135,7 +134,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
               (error: string | false) => {
                 if (error) {
                   log.error(`Error changing volume media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
+                  resolve(mapRoonErrorToStatusCode(error));
                 } else {
                   resolve(uc.StatusCodes.Ok);
                 }
@@ -156,7 +155,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
               (error: string | false) => {
                 if (error) {
                   log.error(`Error changing volume media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
+                  resolve(mapRoonErrorToStatusCode(error));
                 } else {
                   resolve(uc.StatusCodes.Ok);
                 }
@@ -178,7 +177,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
               (error: string | false) => {
                 if (error) {
                   log.error(`Error changing volume media player: ${error}`);
-                  resolve(uc.StatusCodes.ServerError);
+                  resolve(mapRoonErrorToStatusCode(error));
                 } else {
                   resolve(uc.StatusCodes.Ok);
                 }
@@ -196,7 +195,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
             this.roonDriver.roonTransport?.mute(output.output_id, roonCmd, (error: string | false) => {
               if (error) {
                 log.error(`Error on ${roonCmd} media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
+                resolve(mapRoonErrorToStatusCode(error));
               } else {
                 resolve(uc.StatusCodes.Ok);
               }
@@ -214,7 +213,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
             (error: string | false) => {
               if (error) {
                 log.error(`Error seeking media player: ${error}`);
-                resolve(uc.StatusCodes.ServerError);
+                resolve(mapRoonErrorToStatusCode(error));
               } else {
                 resolve(uc.StatusCodes.Ok);
               }
@@ -226,7 +225,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           this.roonDriver.roonTransport?.change_settings(this.id, { shuffle }, (error: string | false) => {
             if (error) {
               log.error(`Shuffle error: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
+              resolve(mapRoonErrorToStatusCode(error));
             } else {
               resolve(uc.StatusCodes.Ok);
             }
@@ -239,7 +238,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           this.roonDriver.roonTransport?.change_settings(this.id, { loop }, (error: string | false) => {
             if (error) {
               log.error(`Repeat error: ${error}`);
-              resolve(uc.StatusCodes.ServerError);
+              resolve(mapRoonErrorToStatusCode(error));
             } else {
               resolve(uc.StatusCodes.Ok);
             }
@@ -331,15 +330,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       return new SearchResult(items, new uc.Pagination(search.paging.page, search.paging.limit));
     } catch (e: unknown) {
       log.error(`Error searching: ${e}`);
-      if (e instanceof Error) {
-        switch (e.message) {
-          case "ZoneNotFound":
-            return uc.StatusCodes.ServiceUnavailable;
-          case "InvalidItemKey":
-            return uc.StatusCodes.BadRequest;
-        }
-      }
-      return uc.StatusCodes.ServerError;
+      return mapRoonErrorToStatusCode(e);
     }
   }
 
@@ -502,15 +493,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       return uc.BrowseResult.fromPaging(browseItem, options.paging, totalCount);
     } catch (e: unknown) {
       log.error(`Error browsing: ${e}`);
-      if (e instanceof Error) {
-        switch (e.message) {
-          case "ZoneNotFound":
-            return uc.StatusCodes.ServiceUnavailable;
-          case "InvalidItemKey":
-            return uc.StatusCodes.BadRequest;
-        }
-      }
-      return uc.StatusCodes.ServerError;
+      return mapRoonErrorToStatusCode(e);
     }
   }
 
