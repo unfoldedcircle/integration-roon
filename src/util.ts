@@ -8,7 +8,9 @@
 import fs from "fs";
 import log from "./loggers.js";
 import * as uc from "@unfoldedcircle/integration-api";
-import type { LoopSetting, Zone } from "node-roon-api";
+import { StatusCodes } from "@unfoldedcircle/integration-api";
+import type { Zone } from "node-roon-api";
+import { type RoonDriver, RoonMediaPlayer } from "./media-player.js";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -25,7 +27,7 @@ export const convertImageToBase64 = (file: fs.PathOrFileDescriptor) => {
 };
 
 export const mediaPlayerAttributesFromZone = (zone: Zone) => {
-  const attr: { [key: string]: string | number | boolean } = {};
+  const attr: uc.EntityAttributes = {};
 
   if (!zone) {
     return attr;
@@ -40,6 +42,9 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
     case "stopped":
     case "paused":
       state = uc.MediaPlayerStates.Paused;
+      break;
+    case "loading":
+      state = uc.MediaPlayerStates.Buffering;
       break;
   }
   attr[uc.MediaPlayerAttributes.State] = state;
@@ -82,19 +87,16 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   attr[uc.MediaPlayerAttributes.Shuffle] = !!zone.settings?.shuffle;
   attr[uc.MediaPlayerAttributes.Repeat] = getRepeatMode(zone);
 
+  // Note: play actions might not work for all media items. This requires further investigation.
+  // Maybe we can also add "Play From Here" and "Start Radio"
+  attr[uc.MediaPlayerAttributes.PlayMediaAction] = [
+    uc.KnownMediaPlayAction.PlayNow,
+    uc.KnownMediaPlayAction.PlayNext,
+    uc.KnownMediaPlayAction.AddToQueue
+  ];
+
   return attr;
 };
-
-export function getLoopMode(repeat: string | undefined): LoopSetting {
-  switch (repeat) {
-    case uc.RepeatMode.All:
-      return "loop";
-    case uc.RepeatMode.One:
-      return "loop_one";
-    default:
-      return "disabled";
-  }
-}
 
 function getRepeatMode(zone: Zone): uc.RepeatMode {
   switch (zone.settings?.loop) {
@@ -107,7 +109,7 @@ function getRepeatMode(zone: Zone): uc.RepeatMode {
   }
 }
 
-export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) {
+export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttributes: boolean = false) {
   const features = [
     uc.MediaPlayerFeatures.MuteToggle,
     uc.MediaPlayerFeatures.PlayPause,
@@ -121,7 +123,11 @@ export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) 
     uc.MediaPlayerFeatures.MediaAlbum,
     uc.MediaPlayerFeatures.MediaImageUrl,
     uc.MediaPlayerFeatures.Shuffle,
-    uc.MediaPlayerFeatures.Repeat
+    uc.MediaPlayerFeatures.Repeat,
+    uc.MediaPlayerFeatures.BrowseMedia,
+    uc.MediaPlayerFeatures.PlayMedia,
+    uc.MediaPlayerFeatures.PlayMediaAction,
+    uc.MediaPlayerFeatures.SearchMedia
   ];
 
   // TODO add & test REPEAT, SHUFFLE
@@ -132,14 +138,70 @@ export function newEntityFromZone(zone: Zone, emptyAttributes: boolean = false) 
   }
 
   const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
-  const entity = new uc.MediaPlayer(
+  const entity = new RoonMediaPlayer(
     zone.zone_id,
     { en: zone.display_name },
     {
       features,
       attributes
-    }
+    },
+    driver
   );
 
   return entity;
+}
+
+/**
+ * Splits a media path string into an array of strings based on "/" as the delimiter,
+ * while respecting quoted substrings (double quotes).
+ *
+ * Leading and trailing slashes are removed from the path.
+ *
+ * @param {string} path - The media path string to be split. Quoted sections are treated as single tokens.
+ * @return {string[]} An array of strings obtained by splitting the input path. Quoted sections remain intact.
+ */
+export function splitMediaPath(path: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  if (path.startsWith("/")) {
+    path = path.substring(1);
+  }
+  if (path.endsWith("/")) {
+    path = path.substring(0, path.length - 1);
+  }
+
+  for (let i = 0; i < path.length; i++) {
+    const char = path[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "/" && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+/**
+ * Maps a Roon error (either an Error object or a string) to a UC StatusCodes.
+ *
+ * @param {unknown} e - The error to map.
+ * @returns {StatusCodes} The corresponding UC status code.
+ */
+export function mapRoonErrorToStatusCode(e: unknown): StatusCodes {
+  const message = e instanceof Error ? e.message : String(e);
+
+  switch (message) {
+    case "ZoneNotFound":
+      return StatusCodes.ServiceUnavailable;
+    case "InvalidItemKey":
+      return StatusCodes.BadRequest;
+    default:
+      return StatusCodes.ServerError;
+  }
 }
