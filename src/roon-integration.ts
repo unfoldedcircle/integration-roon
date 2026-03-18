@@ -73,8 +73,8 @@ export default class RoonDriver implements RoonDriverInterface {
 
   private handleDriverSetupRequest(msg: uc.DriverSetupRequest): uc.SetupAction {
     if (msg.reconfigure) {
-      // TODO redesign setup flow: do we really want to delete the configration at this point?
-      //      This should be done as late as possible: the user should not loose the old cfg if setup fails!
+      // TODO redesign setup flow: do we really want to delete the configuration at this point?
+      //      This should be done as late as possible: the user should not lose the old cfg if setup fails!
       this.config.clear();
     }
     const img = convertImageToBase64("./assets/setupimg.png");

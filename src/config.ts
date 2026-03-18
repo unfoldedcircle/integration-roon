@@ -13,7 +13,7 @@ const CFG_FILENAME = "roon_config.json";
 
 class Config {
   private zones: { [key: string]: Zone } = {};
-  private configPath: string;
+  private readonly configPath: string;
 
   constructor(configDir: string) {
     this.configPath = path.join(configDir, CFG_FILENAME);

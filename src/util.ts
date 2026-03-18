@@ -49,12 +49,15 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   }
   attr[uc.MediaPlayerAttributes.State] = state;
 
-  if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
+  const volume = zone.outputs?.[0]?.volume;
+  if (volume) {
     // volume
-    attr[uc.MediaPlayerAttributes.Volume] = zone.outputs[0].volume.value ?? 0;
+    if (volume.type !== "incremental") {
+      attr[uc.MediaPlayerAttributes.Volume] = volume.value ?? 0;
+    }
 
     // muted
-    attr[uc.MediaPlayerAttributes.Muted] = zone.outputs[0].volume.is_muted ?? false;
+    attr[uc.MediaPlayerAttributes.Muted] = volume.is_muted ?? false;
   }
 
   let mediaDuration = 0;
@@ -130,15 +133,17 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     uc.MediaPlayerFeatures.SearchMedia
   ];
 
-  // TODO add & test REPEAT, SHUFFLE
-  if (zone.outputs && zone.outputs[0] && zone.outputs[0].volume) {
-    // FIXME #25 not all Roon zones support volume setting! Check for `type: incremental`
-    features.push(uc.MediaPlayerFeatures.Volume);
+  // #25 not all Roon zones support volume setting
+  const volume = zone.outputs?.[0]?.volume;
+  if (volume) {
+    if (volume.type !== "incremental") {
+      features.push(uc.MediaPlayerFeatures.Volume);
+    }
     features.push(uc.MediaPlayerFeatures.VolumeUpDown);
   }
 
   const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
-  const entity = new RoonMediaPlayer(
+  return new RoonMediaPlayer(
     zone.zone_id,
     { en: zone.display_name },
     {
@@ -147,8 +152,6 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     },
     driver
   );
-
-  return entity;
 }
 
 /**
@@ -198,6 +201,7 @@ export function mapRoonErrorToStatusCode(e: unknown): StatusCodes {
 
   switch (message) {
     case "ZoneNotFound":
+    case "ServiceUnavailable":
       return StatusCodes.ServiceUnavailable;
     case "InvalidItemKey":
       return StatusCodes.BadRequest;

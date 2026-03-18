@@ -10,7 +10,7 @@ import { KnownMediaClass, KnownMediaContentType, SearchResult } from "@unfoldedc
 import { type MediaContentType } from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 
-import type { LoopSetting, Output } from "node-roon-api";
+import type { LoopSetting, Output, Volume } from "node-roon-api";
 import RoonApiTransport from "node-roon-api-transport";
 import type { Item, RoonApiBrowseHierarchy, RoonApiBrowseOptions } from "node-roon-api-browse";
 import type { BrowseService } from "./roon-browse.js";
@@ -90,109 +90,12 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     log.info(`Command: ${cmdId}`);
 
     return new Promise((resolve) => {
-      switch (cmdId) {
-        case uc.MediaPlayerCommands.PlayPause: {
-          const roonCmd =
-            this.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
-          this.roonDriver.roonTransport?.control(this.id, roonCmd, (error: string | false) => {
-            if (error) {
-              log.error(`Error on ${roonCmd} media player: ${error}`);
-              resolve(mapRoonErrorToStatusCode(error));
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        }
-        case uc.MediaPlayerCommands.Next:
-          this.roonDriver.roonTransport?.control(this.id, "next", (error: string | false) => {
-            if (error) {
-              log.error(`Error next media player: ${error}`);
-              resolve(mapRoonErrorToStatusCode(error));
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        case uc.MediaPlayerCommands.Previous:
-          this.roonDriver.roonTransport?.control(this.id, "previous", (error: string | false) => {
-            if (error) {
-              log.error(`Error previous media player: ${error}`);
-              resolve(mapRoonErrorToStatusCode(error));
-            } else {
-              resolve(uc.StatusCodes.Ok);
-            }
-          });
-          break;
-        case uc.MediaPlayerCommands.Volume: {
-          const output = this.roonDriver.getDefaultZoneOutput(this.id);
-          if (output) {
-            this.roonDriver.roonTransport?.change_volume(
-              output.output_id,
-              "absolute",
-              Number(params?.volume),
-              (error: string | false) => {
-                if (error) {
-                  log.error(`Error changing volume media player: ${error}`);
-                  resolve(mapRoonErrorToStatusCode(error));
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              }
-            );
-          } else {
-            resolve(uc.StatusCodes.ServiceUnavailable);
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.VolumeUp: {
-          const output = this.roonDriver.getDefaultZoneOutput(this.id);
-          if (output) {
-            this.roonDriver.roonTransport?.change_volume(
-              output.output_id,
-              "relative_step",
-              1,
-              (error: string | false) => {
-                if (error) {
-                  log.error(`Error changing volume media player: ${error}`);
-                  resolve(mapRoonErrorToStatusCode(error));
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              }
-            );
-          } else {
-            log.error(`Volume up, output not found, entity:${this.id}`);
-            resolve(uc.StatusCodes.ServiceUnavailable);
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.VolumeDown: {
-          const output = this.roonDriver.getDefaultZoneOutput(this.id);
-          if (output) {
-            this.roonDriver.roonTransport?.change_volume(
-              output.output_id,
-              "relative_step",
-              -1,
-              (error: string | false) => {
-                if (error) {
-                  log.error(`Error changing volume media player: ${error}`);
-                  resolve(mapRoonErrorToStatusCode(error));
-                } else {
-                  resolve(uc.StatusCodes.Ok);
-                }
-              }
-            );
-          } else {
-            resolve(uc.StatusCodes.ServiceUnavailable);
-          }
-          break;
-        }
-        case uc.MediaPlayerCommands.MuteToggle: {
-          const output = this.roonDriver.getDefaultZoneOutput(this.id);
-          if (output) {
-            const roonCmd = this.attributes?.[uc.MediaPlayerAttributes.Muted] ? "unmute" : "mute";
-            this.roonDriver.roonTransport?.mute(output.output_id, roonCmd, (error: string | false) => {
+      try {
+        switch (cmdId) {
+          case uc.MediaPlayerCommands.PlayPause: {
+            const roonCmd =
+              this.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
+            this.roonDriver.roonTransport?.control(this.id, roonCmd, (error: string | false) => {
               if (error) {
                 log.error(`Error on ${roonCmd} media player: ${error}`);
                 resolve(mapRoonErrorToStatusCode(error));
@@ -200,100 +103,155 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
                 resolve(uc.StatusCodes.Ok);
               }
             });
-          } else {
-            resolve(uc.StatusCodes.ServiceUnavailable);
+            break;
           }
-          break;
-        }
-        case uc.MediaPlayerCommands.Seek:
-          this.roonDriver.roonTransport?.seek(
-            this.id,
-            "absolute",
-            Number(params?.media_position),
-            (error: string | false) => {
+          case uc.MediaPlayerCommands.Next:
+            this.roonDriver.roonTransport?.control(this.id, "next", (error: string | false) => {
               if (error) {
-                log.error(`Error seeking media player: ${error}`);
+                log.error(`Error next media player: ${error}`);
                 resolve(mapRoonErrorToStatusCode(error));
               } else {
                 resolve(uc.StatusCodes.Ok);
               }
-            }
-          );
-          break;
-        case uc.MediaPlayerCommands.Shuffle: {
-          const shuffle = !!params?.shuffle;
-          this.roonDriver.roonTransport?.change_settings(this.id, { shuffle }, (error: string | false) => {
-            if (error) {
-              log.error(`Shuffle error: ${error}`);
-              resolve(mapRoonErrorToStatusCode(error));
+            });
+            break;
+          case uc.MediaPlayerCommands.Previous:
+            this.roonDriver.roonTransport?.control(this.id, "previous", (error: string | false) => {
+              if (error) {
+                log.error(`Error previous media player: ${error}`);
+                resolve(mapRoonErrorToStatusCode(error));
+              } else {
+                resolve(uc.StatusCodes.Ok);
+              }
+            });
+            break;
+          case uc.MediaPlayerCommands.Volume: {
+            if (typeof params?.volume !== "number" || params.volume < 0 || params.volume > 100) {
+              log.warn(`Volume parameter is not a valid number: ${params?.volume}`);
+              resolve(uc.StatusCodes.BadRequest);
             } else {
-              resolve(uc.StatusCodes.Ok);
+              resolve(this.setVolumeNormalized(params.volume / 100));
             }
-          });
-          break;
-        }
-        case uc.MediaPlayerCommands.Repeat: {
-          const repeat = params?.repeat?.toString();
-          const loop = getLoopMode(repeat);
-          this.roonDriver.roonTransport?.change_settings(this.id, { loop }, (error: string | false) => {
-            if (error) {
-              log.error(`Repeat error: ${error}`);
-              resolve(mapRoonErrorToStatusCode(error));
+            break;
+          }
+          case uc.MediaPlayerCommands.VolumeUp: {
+            resolve(this.volumeUp());
+            break;
+          }
+          case uc.MediaPlayerCommands.VolumeDown: {
+            resolve(this.volumeDown());
+            break;
+          }
+          case uc.MediaPlayerCommands.MuteToggle: {
+            const output = this.roonDriver.getDefaultZoneOutput(this.id);
+            if (output) {
+              const roonCmd = this.attributes?.[uc.MediaPlayerAttributes.Muted] ? "unmute" : "mute";
+              this.roonDriver.roonTransport?.mute(output.output_id, roonCmd, (error: string | false) => {
+                if (error) {
+                  log.error(`Error on ${roonCmd} media player: ${error}`);
+                  resolve(mapRoonErrorToStatusCode(error));
+                } else {
+                  resolve(uc.StatusCodes.Ok);
+                }
+              });
             } else {
-              resolve(uc.StatusCodes.Ok);
+              resolve(uc.StatusCodes.ServiceUnavailable);
             }
-          });
-          break;
-        }
-        case uc.MediaPlayerCommands.PlayMedia: {
-          const itemKey = params?.media_id as string;
-          const mediaType = params?.media_type as string;
-          const action = params?.action as string;
-
-          if (!this.roonDriver.browseService) {
-            return uc.StatusCodes.ServiceUnavailable;
+            break;
           }
-
-          if (mediaType === "library" || mediaType === "track" || mediaType === "search") {
-            if (action) {
-              log.warn("Play action parameter is not supported");
-            }
-            // media_id is a roon browser id
-            // Roon quirk: a media_id returned from a search requires matching hierarchy.
-            const hierarchy: RoonApiBrowseHierarchy = mediaType === "search" ? "search" : "browse";
-
-            resolve(this.roonDriver.browseService.playItemById(this.id, itemKey, hierarchy));
-          } else {
-            // media_id is a path matching the Roon menu structure
-            const pathList = splitMediaPath(itemKey);
-            let playAction;
-
-            // best effort play action. Might work, or not with the mysterious Roon API
-            switch (action) {
-              case uc.KnownMediaPlayAction.PlayNow: {
-                // use default action
-                break;
+          case uc.MediaPlayerCommands.Seek:
+            this.roonDriver.roonTransport?.seek(
+              this.id,
+              "absolute",
+              Number(params?.media_position),
+              (error: string | false) => {
+                if (error) {
+                  log.error(`Error seeking media player: ${error}`);
+                  resolve(mapRoonErrorToStatusCode(error));
+                } else {
+                  resolve(uc.StatusCodes.Ok);
+                }
               }
-              case uc.KnownMediaPlayAction.PlayNext: {
-                playAction = "Add Next";
-                break;
+            );
+            break;
+          case uc.MediaPlayerCommands.Shuffle: {
+            const shuffle = !!params?.shuffle;
+            this.roonDriver.roonTransport?.change_settings(this.id, { shuffle }, (error: string | false) => {
+              if (error) {
+                log.error(`Shuffle error: ${error}`);
+                resolve(mapRoonErrorToStatusCode(error));
+              } else {
+                resolve(uc.StatusCodes.Ok);
               }
-              case uc.KnownMediaPlayAction.AddToQueue: {
-                playAction = "Queue";
-                break;
-              }
-              default:
-                log.warn(`Ignoring unsupported play action: ${action}`);
-                break;
-            }
-
-            resolve(this.roonDriver.browseService.playItemByPath(this.id, pathList, playAction));
+            });
+            break;
           }
-          break;
+          case uc.MediaPlayerCommands.Repeat: {
+            const repeat = params?.repeat?.toString();
+            const loop = getLoopMode(repeat);
+            this.roonDriver.roonTransport?.change_settings(this.id, { loop }, (error: string | false) => {
+              if (error) {
+                log.error(`Repeat error: ${error}`);
+                resolve(mapRoonErrorToStatusCode(error));
+              } else {
+                resolve(uc.StatusCodes.Ok);
+              }
+            });
+            break;
+          }
+          case uc.MediaPlayerCommands.PlayMedia: {
+            const itemKey = params?.media_id as string;
+            const mediaType = params?.media_type as string;
+            const action = params?.action as string;
+
+            if (!this.roonDriver.browseService) {
+              return uc.StatusCodes.ServiceUnavailable;
+            }
+
+            if (mediaType === "library" || mediaType === "track" || mediaType === "search") {
+              if (action) {
+                log.warn("Play action parameter is not supported");
+              }
+              // media_id is a roon browser id
+              // Roon quirk: a media_id returned from a search requires matching hierarchy.
+              const hierarchy: RoonApiBrowseHierarchy = mediaType === "search" ? "search" : "browse";
+
+              resolve(this.roonDriver.browseService.playItemById(this.id, itemKey, hierarchy));
+            } else {
+              // media_id is a path matching the Roon menu structure
+              const pathList = splitMediaPath(itemKey);
+              let playAction;
+
+              // best effort play action. Might work, or not with the mysterious Roon API
+              switch (action) {
+                case uc.KnownMediaPlayAction.PlayNow: {
+                  // use default action
+                  break;
+                }
+                case uc.KnownMediaPlayAction.PlayNext: {
+                  playAction = "Add Next";
+                  break;
+                }
+                case uc.KnownMediaPlayAction.AddToQueue: {
+                  playAction = "Queue";
+                  break;
+                }
+                default:
+                  log.warn(`Ignoring unsupported play action: ${action}`);
+                  break;
+              }
+
+              resolve(this.roonDriver.browseService.playItemByPath(this.id, pathList, playAction));
+            }
+            break;
+          }
+          default:
+            log.warn(`Unknown entity command: ${cmdId}`);
+            resolve(uc.StatusCodes.BadRequest);
         }
-        default:
-          log.warn(`Unknown entity command: ${cmdId}`);
-          resolve(uc.StatusCodes.BadRequest);
+      } catch (e: unknown) {
+        log.error(`Error executing command: ${e}`);
+        resolve(mapRoonErrorToStatusCode(e));
       }
     });
   }
@@ -583,5 +541,138 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       default:
         return KnownMediaClass.Directory;
     }
+  }
+
+  /**
+   * Volume up by one logical step (button behavior)
+   *
+   * https://github.com/RoonLabs/node-roon-api-transport/blob/master/lib.js#L62-L73
+   */
+  async volumeUp(): Promise<uc.StatusCodes> {
+    const output = this.roonDriver.getDefaultZoneOutput(this.id);
+    const v = this.ensureVolume(output);
+    let how: "relative" | "relative_step";
+    let value: number;
+
+    switch (v.type) {
+      case "incremental":
+        // Incremental: only +/- buttons, no range or current value
+        how = "relative";
+        value = 1;
+        break;
+
+      case "db":
+      case "number":
+      default: {
+        // Use the device's step size if available, otherwise fall back
+        const step = v.step ?? 1.0;
+        how = "relative_step";
+        value = step;
+        break;
+      }
+    }
+
+    return await this.callChangeVolume(output!, how, value);
+  }
+
+  /**
+   * Volume down by one logical step (button behavior)
+   */
+  async volumeDown(): Promise<uc.StatusCodes> {
+    const output = this.roonDriver.getDefaultZoneOutput(this.id);
+    const v = this.ensureVolume(output);
+    let how: "relative" | "relative_step";
+    let value: number;
+
+    switch (v.type) {
+      case "incremental":
+        how = "relative";
+        value = -1;
+        break;
+
+      case "db":
+      case "number":
+      default: {
+        const step = v.step ?? 1.0;
+        how = "relative_step";
+        value = -step;
+        break;
+      }
+    }
+
+    return await this.callChangeVolume(output!, how, value);
+  }
+
+  /**
+   * Direct volume set, normalized 0..1 (or any 0..100 UI that you map to 0..1)
+   * Only for db/number-like controls.
+   */
+  async setVolumeNormalized(norm: number): Promise<uc.StatusCodes> {
+    const output = this.roonDriver.getDefaultZoneOutput(this.id);
+    const v = this.ensureVolume(output);
+
+    if (v.type === "incremental") {
+      log.error("Incremental volume does not support absolute volume setting");
+      return uc.StatusCodes.BadRequest;
+    }
+
+    if (v.min === undefined || v.max === undefined) {
+      log.error("Volume range (min/max) not provided by Roon");
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    // Clamp 0..1
+    const clamped = Math.min(1, Math.max(0, norm));
+    const value = v.min + (v.max - v.min) * clamped;
+
+    return await this.callChangeVolume(output!, "absolute", value);
+  }
+
+  /**
+   * Optional: absolute set with a value in native units (db or number)
+   */
+  async setVolumeAbsolute(nativeValue: number): Promise<uc.StatusCodes> {
+    const output = this.roonDriver.getDefaultZoneOutput(this.id);
+    const v = this.ensureVolume(output);
+    if (v.type === "incremental") {
+      log.error("Incremental volume does not support absolute volume setting");
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    const min = v.min ?? nativeValue;
+    const max = v.max ?? nativeValue;
+    const clamped = Math.min(max, Math.max(min, nativeValue));
+
+    return await this.callChangeVolume(output!, "absolute", clamped);
+  }
+
+  private ensureVolume(output: Output | undefined): Volume {
+    if (!output) {
+      log.error(`No default output available`);
+      throw new Error("ServiceUnavailable");
+    }
+    const v = output.volume;
+    if (!v) {
+      log.error(`Output "${output.display_name}" has no volume control`);
+      throw new Error("ServiceUnavailable");
+    }
+    return v;
+  }
+
+  private async callChangeVolume(
+    output: Output,
+    how: "absolute" | "relative" | "relative_step",
+    value: number
+  ): Promise<uc.StatusCodes> {
+    return new Promise((resolve, reject) => {
+      this.roonDriver.roonTransport?.change_volume(output, how, value, (error: string | false) => {
+        if (error) {
+          log.error("Change volume error: %s", error);
+          resolve(mapRoonErrorToStatusCode(error));
+        } else {
+          resolve(uc.StatusCodes.Ok);
+        }
+      });
+    });
   }
 }
