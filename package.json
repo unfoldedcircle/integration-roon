@@ -15,7 +15,7 @@
   "author": "Unfolded Circle",
   "license": "MPL-2.0",
   "dependencies": {
-    "@unfoldedcircle/integration-api": "^0.4.1",
+    "@unfoldedcircle/integration-api": "^0.4.2",
     "debug": "^4.4.3",
     "node-roon-api": "github:unfoldedcircle/node-roon-api#e4b1ab30c8781395d84674adfa719da5846e9683",
     "node-roon-api-browse": "github:roonlabs/node-roon-api-browse#98adcbaba3a30fd6ce109c1f04cd361536143222",
