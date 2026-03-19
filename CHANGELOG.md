@@ -11,6 +11,12 @@ _Changes in the next release_
 
 ---
 
+## 0.5.1 - 2026-03-19
+
+### Fixed
+
+- Correctly return the total number of browse results.
+
 ## 0.5.0 - 2026-03-18
 
 ### Added
