@@ -65,6 +65,8 @@ export function getLoopMode(repeat: string | undefined): LoopSetting {
 }
 
 export class RoonMediaPlayer extends uc.MediaPlayer {
+  private _supportsStandby = false;
+
   constructor(
     zoneId: string,
     name: uc.EntityName,
@@ -72,6 +74,15 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     private readonly roonDriver: RoonDriver
   ) {
     super(zoneId, name, params);
+  }
+
+  /**
+   * Updates the standby support flag based on Roon zone data.
+   *
+   * @param supportsStandby true if the media player supports standby.
+   */
+  updateStandbySupport(supportsStandby: boolean) {
+    this._supportsStandby = supportsStandby;
   }
 
   async command(cmdId: string, params?: uc.EntityCommandParams): Promise<uc.StatusCodes> {
@@ -92,6 +103,93 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     return new Promise((resolve) => {
       try {
         switch (cmdId) {
+          case uc.MediaPlayerCommands.On: {
+            const output = this.roonDriver.getDefaultZoneOutput(this.id);
+            if (!this._supportsStandby || !output?.source_controls) {
+              this.roonDriver.roonTransport?.control(this.id, "play", (error: string | false) => {
+                if (error) {
+                  log.error(`Error play media player fallback: ${error}`);
+                  resolve(mapRoonErrorToStatusCode(error));
+                } else {
+                  resolve(uc.StatusCodes.Ok);
+                }
+              });
+              return;
+            }
+            for (const source of output.source_controls) {
+              if (source.supports_standby && source.status !== "indeterminate") {
+                this.roonDriver.roonTransport?.convenience_switch(
+                  output.output_id,
+                  { control_key: source.control_key },
+                  (error: string | false) => {
+                    if (error) {
+                      log.error(`Error on convenience switch: ${error}`);
+                      resolve(mapRoonErrorToStatusCode(error));
+                    } else {
+                      resolve(uc.StatusCodes.Ok);
+                    }
+                  }
+                );
+                return;
+              }
+            }
+            break;
+          }
+          case uc.MediaPlayerCommands.Off: {
+            const output = this.roonDriver.getDefaultZoneOutput(this.id);
+            if (!this._supportsStandby || !output?.source_controls) {
+              this.roonDriver.roonTransport?.control(this.id, "stop", (error: string | false) => {
+                if (error) {
+                  log.error(`Error stop media player fallback: ${error}`);
+                  resolve(mapRoonErrorToStatusCode(error));
+                } else {
+                  resolve(uc.StatusCodes.Ok);
+                }
+              });
+              return;
+            }
+            for (const source of output.source_controls) {
+              if (source.supports_standby && source.status !== "indeterminate") {
+                this.roonDriver.roonTransport?.standby(
+                  output.output_id,
+                  { control_key: source.control_key },
+                  (error: string | false) => {
+                    if (error) {
+                      log.error(`Error on standby: ${error}`);
+                      resolve(mapRoonErrorToStatusCode(error));
+                    } else {
+                      resolve(uc.StatusCodes.Ok);
+                    }
+                  }
+                );
+                return;
+              }
+            }
+            break;
+          }
+          case uc.MediaPlayerCommands.Toggle: {
+            let command: uc.MediaPlayerCommands;
+            const state = this.attributes?.[uc.MediaPlayerAttributes.State];
+
+            if (state === uc.MediaPlayerStates.Off || state === uc.MediaPlayerStates.Standby) {
+              command = uc.MediaPlayerCommands.On;
+            } else {
+              command = uc.MediaPlayerCommands.Off;
+            }
+
+            this.command(command).then(resolve);
+            break;
+          }
+          case uc.MediaPlayerCommands.Stop:
+            this.roonDriver.roonTransport?.control(this.id, "stop", (error: string | false) => {
+              if (error) {
+                log.error(`Error stop media player: ${error}`);
+                resolve(mapRoonErrorToStatusCode(error));
+              } else {
+                resolve(uc.StatusCodes.Ok);
+              }
+            });
+            break;
           case uc.MediaPlayerCommands.PlayPause: {
             const roonCmd =
               this.attributes?.[uc.MediaPlayerAttributes.State] === uc.MediaPlayerStates.Playing ? "pause" : "play";
