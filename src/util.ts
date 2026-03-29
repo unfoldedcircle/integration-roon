@@ -35,17 +35,47 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
 
   // state
   let state = uc.MediaPlayerStates.Unknown;
-  switch (zone.state) {
-    case "playing":
-      state = uc.MediaPlayerStates.Playing;
-      break;
-    case "stopped":
-    case "paused":
-      state = uc.MediaPlayerStates.Paused;
-      break;
-    case "loading":
-      state = uc.MediaPlayerStates.Buffering;
-      break;
+
+  // Logic from Home Assistant: power state from source control (if supported)
+  let powerOff = false;
+  let standbyFound = false;
+  if (zone.outputs) {
+    for (const output of zone.outputs) {
+      if (output.source_controls) {
+        for (const source of output.source_controls) {
+          if (source.supports_standby && source.status !== "indeterminate") {
+            standbyFound = true;
+            if (source.status === "standby" || source.status === "deselected") {
+              powerOff = true;
+            }
+            break;
+          }
+        }
+      }
+      if (standbyFound) {
+        break;
+      }
+    }
+  }
+
+  if (powerOff) {
+    state = uc.MediaPlayerStates.Off;
+  } else {
+    switch (zone.state) {
+      case "playing":
+        state = uc.MediaPlayerStates.Playing;
+        break;
+      case "stopped":
+        // HA maps stopped to idle, but we don't have this state. Standby should work instead.
+        state = uc.MediaPlayerStates.Standby;
+        break;
+      case "paused":
+        state = uc.MediaPlayerStates.Paused;
+        break;
+      case "loading":
+        state = uc.MediaPlayerStates.Buffering;
+        break;
+    }
   }
   attr[uc.MediaPlayerAttributes.State] = state;
 
@@ -101,6 +131,27 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   return attr;
 };
 
+/**
+ * Checks if a zone supports standby based on its source controls.
+ *
+ * @param {Zone} zone The Roon zone to check.
+ * @returns {boolean} true if standby is supported.
+ */
+export function getStandbySupport(zone: Zone): boolean {
+  if (zone.outputs) {
+    for (const output of zone.outputs) {
+      if (output.source_controls) {
+        for (const source of output.source_controls) {
+          if (source.supports_standby && source.status !== "indeterminate") {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 function getRepeatMode(zone: Zone): uc.RepeatMode {
   switch (zone.settings?.loop) {
     case "loop":
@@ -130,7 +181,10 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     uc.MediaPlayerFeatures.BrowseMedia,
     uc.MediaPlayerFeatures.PlayMedia,
     uc.MediaPlayerFeatures.PlayMediaAction,
-    uc.MediaPlayerFeatures.SearchMedia
+    uc.MediaPlayerFeatures.SearchMedia,
+    uc.MediaPlayerFeatures.OnOff,
+    uc.MediaPlayerFeatures.Toggle,
+    uc.MediaPlayerFeatures.Stop
   ];
 
   // #25 not all Roon zones support volume setting
@@ -143,7 +197,7 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
   }
 
   const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
-  return new RoonMediaPlayer(
+  const entity = new RoonMediaPlayer(
     zone.zone_id,
     { en: zone.display_name },
     {
@@ -152,6 +206,12 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
     },
     driver
   );
+
+  if (!emptyAttributes) {
+    entity.updateStandbySupport(getStandbySupport(zone));
+  }
+
+  return entity;
 }
 
 /**

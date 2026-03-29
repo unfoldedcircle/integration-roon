@@ -17,8 +17,14 @@ import RoonApiTransport from "node-roon-api-transport";
 import type { SubscribeZoneChanged, SubscribeZoneSubscribed } from "node-roon-api-transport";
 import { BrowseService } from "./roon-browse.js";
 import Config from "./config.js";
-import { convertImageToBase64, delay, mediaPlayerAttributesFromZone, newEntityFromZone } from "./util.js";
-import type { RoonDriver as RoonDriverInterface } from "./media-player.js";
+import {
+  convertImageToBase64,
+  delay,
+  getStandbySupport,
+  mediaPlayerAttributesFromZone,
+  newEntityFromZone
+} from "./util.js";
+import { type RoonDriver as RoonDriverInterface, RoonMediaPlayer } from "./media-player.js";
 
 import os from "os";
 
@@ -285,6 +291,12 @@ export default class RoonDriver implements RoonDriverInterface {
         }
       }
     }
+
+    const entity = this.driver.getConfiguredEntities().getEntity(zone.zone_id) as RoonMediaPlayer;
+    if (entity) {
+      entity.updateStandbySupport(getStandbySupport(zone));
+    }
+
     return this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr);
   }
 

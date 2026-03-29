@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+
+- Support power commands, standby detection, and stop command.
+
+### Changed
+
+- Map Roon's `stopped` state to `standby`.
+- Update dependencies.
+
 ---
 
 ## 0.5.1 - 2026-03-19
