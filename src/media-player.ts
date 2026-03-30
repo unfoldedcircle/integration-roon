@@ -359,7 +359,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
 
     // Roon searching is a PITA. Anyone know how to get an item path back?
     if (search.stable_ids === true) {
-      log.warn(`Stable IDs are not supported for media search`);
+      log.warn(`Stable IDs are not supported for media search: returning empty result`);
+      return new SearchResult([], new uc.Pagination(search.paging.page, search.paging.limit, 0));
     }
     if (search.media_id || search.media_type) {
       log.warn(`Media ID and type are not supported for media search`);
@@ -393,7 +394,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   async browse(options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
     log.debug(`browse: ${JSON.stringify(options)}`);
 
-    if (options.stable_ids === true) {
+    // Roon search does not support stable IDs
+    if (options.stable_ids === true && options.media_type !== "search") {
       return await this.browseByPath(options);
     } else {
       return await this.browseByItemKey(options);
@@ -521,7 +523,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       log.debug(`Browse result header: ${JSON.stringify(resultHeader)}`);
 
       const header = resultHeader.list;
-      const totalCount = header.count;
+      let totalCount = header.count;
       const title = header.title;
 
       const loadResult = await browseService.load({
@@ -546,9 +548,14 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         items: children
       });
 
+      // best effort adjustment of the total count in containers where action items were filtered out in `convertItems`
+      if (totalCount <= options.paging.limit && totalCount > children.length) {
+        totalCount = children.length;
+      }
+
       return uc.BrowseResult.fromPaging(browseItem, options.paging, totalCount);
     } catch (e: unknown) {
-      log.error(`Error browsing: ${e}`);
+      log.error(`Error browsing ${JSON.stringify(browseOptions)}: ${e}`);
       return mapRoonErrorToStatusCode(e);
     }
   }

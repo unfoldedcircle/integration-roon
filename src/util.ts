@@ -197,12 +197,16 @@ export function newEntityFromZone(zone: Zone, driver: RoonDriver, emptyAttribute
   }
 
   const attributes = emptyAttributes ? {} : mediaPlayerAttributesFromZone(zone);
+  const options = {
+    [uc.MediaPlayerOptions.StableIdSupport]: uc.StableIdSupport.BrowseSupportsStableIdsParam
+  };
   const entity = new RoonMediaPlayer(
     zone.zone_id,
     { en: zone.display_name },
     {
       features,
-      attributes
+      attributes,
+      options
     },
     driver
   );
