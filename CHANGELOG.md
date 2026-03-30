@@ -11,11 +11,13 @@ _Changes in the next release_
 
 ### Added
 
-- Support power commands, standby detection, and stop command.
+- Support power commands, standby detection, and stop command ([#68](https://github.com/unfoldedcircle/integration-roon/pull/68)).
+- Set the stable_id_support option in the media-player entity.
 
 ### Changed
 
-- Map Roon's `stopped` state to `standby`.
+- Map Roon's `stopped` state to `standby` ([#68](https://github.com/unfoldedcircle/integration-roon/pull/68)).
+- Return an empty search result if stable IDs are requested.
 - Update dependencies.
 
 ---
@@ -30,7 +32,7 @@ _Changes in the next release_
 
 ### Added
 
-- Support media browsing, searching and playback of media from Roon ([#65](https://github.com/unfoldedcircle/integration-roon/pull/65)).
+- Support media browsing, searching, and playback of media from Roon ([#65](https://github.com/unfoldedcircle/integration-roon/pull/65)).
 
 ### Fixed
 
