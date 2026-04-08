@@ -11,6 +11,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { StatusCodes } from "@unfoldedcircle/integration-api";
 import type { Zone } from "node-roon-api";
 import { type RoonDriver, RoonMediaPlayer } from "./media-player.js";
+import { calculateVolumeToPercentage } from "./volume.js";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -83,7 +84,7 @@ export const mediaPlayerAttributesFromZone = (zone: Zone) => {
   if (volume) {
     // volume
     if (volume.type !== "incremental") {
-      attr[uc.MediaPlayerAttributes.Volume] = volume.value ?? 0;
+      attr[uc.MediaPlayerAttributes.Volume] = calculateVolumeToPercentage(volume);
     }
 
     // muted

@@ -1,0 +1,44 @@
+{
+  "zone_id": "16014d40f43c107bb9459b29b6703e10acbc",
+  "display_name": "Lyngdorf TDAI 1120",
+  "outputs": [
+    {
+      "output_id": "17014d40f43c107bb9459b29b6703e10acbc",
+      "zone_id": "16014d40f43c107bb9459b29b6703e10acbc",
+      "can_group_with_output_ids": [],
+      "display_name": "Lyngdorf TDAI 1120",
+      "volume": {
+        "type": "number",
+        "min": -99.9,
+        "max": -10,
+        "value": -42.5,
+        "step": 0.1,
+        "is_muted": false,
+        "hard_limit_min": -50,
+        "hard_limit_max": -10,
+        "soft_limit": -25
+      },
+      "source_controls": [
+        {
+          "control_key": "1",
+          "display_name": "Lyngdorf TDAI-1120",
+          "supports_standby": true,
+          "status": "selected"
+        }
+      ]
+    }
+  ],
+  "state": "stopped",
+  "is_next_allowed": false,
+  "is_previous_allowed": true,
+  "is_pause_allowed": false,
+  "is_play_allowed": false,
+  "is_seek_allowed": false,
+  "queue_items_remaining": 0,
+  "queue_time_remaining": 0,
+  "settings": {
+    "loop": "disabled",
+    "shuffle": false,
+    "auto_radio": false
+  }
+}

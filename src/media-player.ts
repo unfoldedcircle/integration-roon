@@ -15,6 +15,12 @@ import RoonApiTransport from "node-roon-api-transport";
 import type { Item, RoonApiBrowseHierarchy, RoonApiBrowseOptions } from "node-roon-api-browse";
 import type { BrowseService } from "./roon-browse.js";
 import { mapRoonErrorToStatusCode, splitMediaPath } from "./util.js";
+import {
+  calculateVolumeAbsolute,
+  calculateVolumeDown,
+  calculateVolumeNormalized,
+  calculateVolumeUp
+} from "./volume.js";
 
 const EXCLUDE_ITEMS = [
   "Play Album",
@@ -603,26 +609,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   async volumeUp(): Promise<uc.StatusCodes> {
     const output = this.roonDriver.getDefaultZoneOutput(this.id);
     const v = this.ensureVolume(output);
-    let how: "relative" | "relative_step";
-    let value: number;
 
-    switch (v.type) {
-      case "incremental":
-        // Incremental: only +/- buttons, no range or current value
-        how = "relative";
-        value = 1;
-        break;
-
-      case "db":
-      case "number":
-      default: {
-        // Use the device's step size if available, otherwise fall back
-        const step = v.step ?? 1.0;
-        how = "relative_step";
-        value = step;
-        break;
-      }
-    }
+    const { how, value } = calculateVolumeUp(v);
 
     return await this.callChangeVolume(output!, how, value);
   }
@@ -633,24 +621,8 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   async volumeDown(): Promise<uc.StatusCodes> {
     const output = this.roonDriver.getDefaultZoneOutput(this.id);
     const v = this.ensureVolume(output);
-    let how: "relative" | "relative_step";
-    let value: number;
 
-    switch (v.type) {
-      case "incremental":
-        how = "relative";
-        value = -1;
-        break;
-
-      case "db":
-      case "number":
-      default: {
-        const step = v.step ?? 1.0;
-        how = "relative_step";
-        value = -step;
-        break;
-      }
-    }
+    const { how, value } = calculateVolumeDown(v);
 
     return await this.callChangeVolume(output!, how, value);
   }
@@ -663,21 +635,16 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     const output = this.roonDriver.getDefaultZoneOutput(this.id);
     const v = this.ensureVolume(output);
 
-    if (v.type === "incremental") {
-      log.error("Incremental volume does not support absolute volume setting");
+    try {
+      const { how, value } = calculateVolumeNormalized(v, norm);
+      return await this.callChangeVolume(output!, how, value);
+    } catch (e) {
+      log.error((e as Error).message);
+      if ((e as Error).message.includes("range")) {
+        return uc.StatusCodes.ServiceUnavailable;
+      }
       return uc.StatusCodes.BadRequest;
     }
-
-    if (v.min === undefined || v.max === undefined) {
-      log.error("Volume range (min/max) not provided by Roon");
-      return uc.StatusCodes.ServiceUnavailable;
-    }
-
-    // Clamp 0..1
-    const clamped = Math.min(1, Math.max(0, norm));
-    const value = v.min + (v.max - v.min) * clamped;
-
-    return await this.callChangeVolume(output!, "absolute", value);
   }
 
   /**
@@ -686,16 +653,14 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   async setVolumeAbsolute(nativeValue: number): Promise<uc.StatusCodes> {
     const output = this.roonDriver.getDefaultZoneOutput(this.id);
     const v = this.ensureVolume(output);
-    if (v.type === "incremental") {
-      log.error("Incremental volume does not support absolute volume setting");
+
+    try {
+      const { how, value } = calculateVolumeAbsolute(v, nativeValue);
+      return await this.callChangeVolume(output!, how, value);
+    } catch (e) {
+      log.error((e as Error).message);
       return uc.StatusCodes.ServiceUnavailable;
     }
-
-    const min = v.min ?? nativeValue;
-    const max = v.max ?? nativeValue;
-    const clamped = Math.min(max, Math.max(min, nativeValue));
-
-    return await this.callChangeVolume(output!, "absolute", clamped);
   }
 
   private ensureVolume(output: Output | undefined): Volume {

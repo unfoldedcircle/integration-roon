@@ -1,0 +1,44 @@
+{
+  "zone_id": "1",
+  "display_name": "TV",
+  "outputs": [
+    {
+      "output_id": "2",
+      "zone_id": "1",
+      "can_group_with_output_ids": [],
+      "display_name": "TV",
+      "volume": {
+        "type": "number",
+        "min": 0,
+        "max": 100,
+        "value": 39,
+        "step": 1,
+        "is_muted": false,
+        "hard_limit_min": 0,
+        "hard_limit_max": 100,
+        "soft_limit": 100
+      },
+      "source_controls": [
+        {
+          "control_key": "1",
+          "display_name": "Chromecast",
+          "supports_standby": false,
+          "status": "indeterminate"
+        }
+      ]
+    }
+  ],
+  "state": "paused",
+  "is_next_allowed": false,
+  "is_previous_allowed": true,
+  "is_pause_allowed": false,
+  "is_play_allowed": true,
+  "is_seek_allowed": true,
+  "queue_items_remaining": 1,
+  "queue_time_remaining": 136,
+  "settings": {
+    "loop": "disabled",
+    "shuffle": false,
+    "auto_radio": false
+  }
+}
