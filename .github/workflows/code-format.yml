@@ -11,9 +11,12 @@ on:
       - "**/*.js"
       - "**/*.ts"
       - ".github/**/*.yml"
-      - ".eslintrc.json"
+      - ".nvmrc"
+      - ".prettierignore"
       - ".prettierrc"
+      - "eslint.config.js"
       - "package-lock.json"
+      - "tsconfig.json"
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened]

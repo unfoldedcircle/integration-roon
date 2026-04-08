@@ -10,6 +10,7 @@ on:
       - "**/*.js"
       - ".github/**/*.yml"
       - ".nvmrc"
+      - "eslint.config.js"
       - "package-lock.json"
       - "driver.json"
       - "tsconfig.json"
@@ -107,7 +108,7 @@ jobs:
         shell: bash
         run: |
           mv dist artifacts/
-          mv artifacts/dist artifacts/bin
+          mv artifacts/dist/src artifacts/bin
           mv artifacts/bin/index.js artifacts/bin/driver.js
           cp -r assets artifacts/bin/
           cp package.json artifacts/bin/

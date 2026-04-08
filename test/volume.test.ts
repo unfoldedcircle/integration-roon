@@ -209,13 +209,14 @@ test("calculateVolumeToPercentage", (t) => {
 for (const file of jsonFiles) {
   test(`Volume control: ${file}`, (t) => {
     const v = loadTestData(file);
-    const step = v.step ?? 1.0;
+    // make sure relative_step is using the fixed step size and not the provided Volume.step value!
+    const step = 1;
 
     // Test Volume Up
-    t.deepEqual(calculateVolumeUp(v), { how: "relative_step", value: 1 });
+    t.deepEqual(calculateVolumeUp(v), { how: "relative_step", value: step });
 
     // Test Volume Down
-    t.deepEqual(calculateVolumeDown(v), { how: "relative_step", value: -1 });
+    t.deepEqual(calculateVolumeDown(v), { how: "relative_step", value: -step });
 
     if (v.min !== undefined && v.max !== undefined) {
       // Test Volume Normalized (0.5)
