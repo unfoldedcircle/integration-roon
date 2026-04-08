@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="index.ts" type="NodeJSConfigurationType" nameIsGenerated="true" path-to-js-file="src/index.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$">
+    <envs>
+      <env name="DEBUG" value="ucapi:*,roon:*" />
+      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
+      <env name="UC_INTEGRATION_HTTP_PORT" value="8100" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

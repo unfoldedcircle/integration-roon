@@ -1,0 +1,44 @@
+{
+  "zone_id": "1",
+  "display_name": "Yamaha",
+  "outputs": [
+    {
+      "output_id": "2",
+      "zone_id": "1",
+      "can_group_with_output_ids": [],
+      "display_name": "Yamaha",
+      "volume": {
+        "type": "number",
+        "min": 1,
+        "max": 100,
+        "value": 71,
+        "step": 1,
+        "is_muted": false,
+        "hard_limit_min": 1,
+        "hard_limit_max": 100,
+        "soft_limit": 100
+      },
+      "source_controls": [
+        {
+          "control_key": "1",
+          "display_name": "Bedroom",
+          "supports_standby": false,
+          "status": "indeterminate"
+        }
+      ]
+    }
+  ],
+  "state": "paused",
+  "is_next_allowed": true,
+  "is_previous_allowed": true,
+  "is_pause_allowed": false,
+  "is_play_allowed": true,
+  "is_seek_allowed": true,
+  "queue_items_remaining": 1,
+  "queue_time_remaining": 58,
+  "settings": {
+    "loop": "loop",
+    "shuffle": false,
+    "auto_radio": true
+  }
+}

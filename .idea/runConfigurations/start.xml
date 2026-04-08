@@ -9,7 +9,7 @@
     <envs>
       <env name="DEBUG" value="*" />
       <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
-      <env name="UC_INTEGRATION_HTTP_PORT" value="8098" />
+      <env name="UC_INTEGRATION_HTTP_PORT" value="8100" />
     </envs>
     <method v="2" />
   </configuration>

@@ -1,0 +1,44 @@
+{
+  "zone_id": "1601eadd6d5e4e17051c94beead759286d8c",
+  "display_name": "Bryston",
+  "outputs": [
+    {
+      "output_id": "1701eadd6d5e4e17051c94beead759286d8c",
+      "zone_id": "1601eadd6d5e4e17051c94beead759286d8c",
+      "can_group_with_output_ids": [],
+      "display_name": "Bryston",
+      "volume": {
+        "type": "number",
+        "min": 0,
+        "max": 100,
+        "value": 46,
+        "step": 1,
+        "is_muted": false,
+        "hard_limit_min": 0,
+        "hard_limit_max": 100,
+        "soft_limit": 100
+      },
+      "source_controls": [
+        {
+          "control_key": "1",
+          "display_name": "snd_rpi_hifiberry_dacplus",
+          "supports_standby": false,
+          "status": "indeterminate"
+        }
+      ]
+    }
+  ],
+  "state": "paused",
+  "is_next_allowed": true,
+  "is_previous_allowed": true,
+  "is_pause_allowed": false,
+  "is_play_allowed": true,
+  "is_seek_allowed": true,
+  "queue_items_remaining": 4,
+  "queue_time_remaining": 627,
+  "settings": {
+    "loop": "loop_one",
+    "shuffle": false,
+    "auto_radio": false
+  }
+}

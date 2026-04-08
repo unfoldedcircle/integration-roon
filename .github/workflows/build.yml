@@ -10,6 +10,7 @@ on:
       - "**/*.js"
       - ".github/**/*.yml"
       - ".nvmrc"
+      - "eslint.config.js"
       - "package-lock.json"
       - "driver.json"
       - "tsconfig.json"
@@ -22,8 +23,35 @@ env:
   BUILD_CHANGELOG: build-changelog.md
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Cache NPM dependencies
+        id: npm-cache
+        uses: actions/cache@v5
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.npm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Run configured tests
+        run: npm run test
+
   build:
     runs-on: ubuntu-24.04
+    needs: [test]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -80,7 +108,7 @@ jobs:
         shell: bash
         run: |
           mv dist artifacts/
-          mv artifacts/dist artifacts/bin
+          mv artifacts/dist/src artifacts/bin
           mv artifacts/bin/index.js artifacts/bin/driver.js
           cp -r assets artifacts/bin/
           cp package.json artifacts/bin/
