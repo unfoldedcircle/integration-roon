@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Fixed
+
+- Error handling in RoonMediaPlayer.command handler, preventing an integration restart if volume output is not available.
+
 ### Added
 
 - Support power commands, standby detection, and stop command ([#68](https://github.com/unfoldedcircle/integration-roon/pull/68)).
@@ -18,6 +22,7 @@ _Changes in the next release_
 
 - Map Roon's `stopped` state to `standby` ([#68](https://github.com/unfoldedcircle/integration-roon/pull/68)).
 - Return an empty search result if stable IDs are requested.
+- Enhanced logging for entity commands and Roon volume changes.
 - Update dependencies.
 
 ---
