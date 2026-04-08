@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.6.0 - 2026-04-08
+
 ### Fixed
 
-- Volume reporting for dB scales ([feature-and-bug-tracker#769](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/769)).
+- Volume reporting for dB scales ([#71](https://github.com/unfoldedcircle/integration-roon/pull/71), [feature-and-bug-tracker#769](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/769)).
 - Error handling in RoonMediaPlayer.command handler, preventing an integration restart if volume output is not available ([#70](https://github.com/unfoldedcircle/integration-roon/pull/70)).
 
 ### Added
@@ -22,13 +26,11 @@ _Changes in the next release_
 ### Changed
 
 - Map Roon's `stopped` state to `standby` ([#68](https://github.com/unfoldedcircle/integration-roon/pull/68)).
-- Use a fixed volume step size of 1 for `relative_step` instead of the reported `step` value ([feature-and-bug-tracker#769](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/769)).
+- Use a fixed volume step size of 1 for `relative_step` instead of the reported `step` value ([#71](https://github.com/unfoldedcircle/integration-roon/pull/71), [feature-and-bug-tracker#769](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/769)).
 - Return an empty search result if stable IDs are requested ([#69](https://github.com/unfoldedcircle/integration-roon/pull/69)).
 - Enhanced logging for entity commands and Roon volume changes ([#70](https://github.com/unfoldedcircle/integration-roon/pull/70)).
-- Extracted volume logic and added unit tests.
+- Extracted volume logic and added unit tests ([#71](https://github.com/unfoldedcircle/integration-roon/pull/71)).
 - Update dependencies.
-
----
 
 ## 0.5.1 - 2026-03-19
 
