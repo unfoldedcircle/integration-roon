@@ -3,14 +3,14 @@
   "type": "module",
   "version": "0.6.0",
   "description": "Roon Integration for the Unfolded Circle",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "scripts": {
     "format": "prettier --write .",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "test": "tsc && ava dist/test/**/*.js",
     "build": "tsc",
-    "start": "npm run build && node dist/index.js"
+    "start": "npm run build && node dist/src/index.js"
   },
   "author": "Unfolded Circle",
   "license": "MPL-2.0",
