@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+
+- Set default logging if the DEBUG environment variable is not set.
+- Update dependencies.
+
 ---
 
 ## 0.6.0 - 2026-04-08

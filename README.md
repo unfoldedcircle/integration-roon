@@ -54,11 +54,13 @@ The configuration files are loaded & saved from the path specified in the enviro
 ### Logging
 
 Logging any kind of output is directed to the [debug](https://www.npmjs.com/package/debug) module.
-To let the integration driver output anything, run the driver with the `DEBUG` environment variable set like:
+To configure custom logging, run the driver with the `DEBUG` environment variable set like:
 
 ```shell
 DEBUG=roon:* npm run start
 ```
+
+If the `DEBUG` environment variable is not set, the driver will use default log settings.
 
 The driver exposes the following log-levels:
 
