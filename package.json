@@ -25,7 +25,7 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@ava/typescript": "^6.0.0",
+    "@ava/typescript": "^7.0.0",
     "@types/debug": "^4.1.12",
     "@types/node": "^22.13.9",
     "ava": "^6.4.1",
