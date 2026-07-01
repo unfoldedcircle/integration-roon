@@ -66,15 +66,7 @@ declare module "node-roon-api-browse" {
    *  * "search"
    */
   export type RoonApiBrowseHierarchy =
-    | "browse"
-    | "playlists"
-    | "settings"
-    | "internet_radio"
-    | "albums"
-    | "artists"
-    | "genres"
-    | "composers"
-    | "search";
+    "browse" | "playlists" | "settings" | "internet_radio" | "albums" | "artists" | "genres" | "composers" | "search";
 
   /**
    * Browse result body
