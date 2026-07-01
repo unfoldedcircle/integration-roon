@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.6.1 - 2026-07-01
+
 ### Changed
 
 - Set default logging if the DEBUG environment variable is not set.
@@ -16,8 +20,6 @@ _Changes in the next release_
 - Update Node.js runtime to 22.22
 - Add GitHub dependabot configuration for npm.
 - Update GitHub actions.
-
----
 
 ## 0.6.0 - 2026-04-08
 
