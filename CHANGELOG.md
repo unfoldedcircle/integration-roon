@@ -14,6 +14,7 @@ _Changes in the next release_
 - Set default logging if the DEBUG environment variable is not set.
 - Update dependencies.
 - Update Node.js runtime to 22.22
+- Add GitHub dependabot configuration for npm
 
 ---
 
