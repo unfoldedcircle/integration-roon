@@ -34,4 +34,3 @@ Please also list any relevant details for your test configuration
 - [ ] My pull request represents one logical piece of work. Do not combine multiple unrelated changes into a single pull request.
 - [ ] My changes pass the linter checks `npm run code-check` and unit tests `npm run test`. PRs with failing linter or unit tests will not be merged.
 - [ ] I have tested and performed a self-review of my code
-
