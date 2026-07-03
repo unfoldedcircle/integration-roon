@@ -35,7 +35,7 @@
     "globals": "^17.6.0",
     "neostandard": "^0.12.2",
     "prettier": "^3.5.3",
-    "typescript": "^5.8.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.26.0"
   }
 }
