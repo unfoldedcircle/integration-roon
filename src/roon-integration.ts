@@ -25,6 +25,7 @@ import {
   newEntityFromZone
 } from "./util.js";
 import { type RoonDriver as RoonDriverInterface, RoonMediaPlayer } from "./media-player.js";
+import { calculateVolumeToPercentage } from "./volume.js";
 
 import os from "os";
 
@@ -43,6 +44,8 @@ export default class RoonDriver implements RoonDriverInterface {
     height: 480,
     format: "image/jpeg"
   };
+
+  private currentZones: Map<string, Zone> = new Map();
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -141,6 +144,7 @@ export default class RoonDriver implements RoonDriverInterface {
 
   private async handleSubscribeEntities(entityIds: string[]) {
     log.debug("Subscribe entities: %s", entityIds);
+
     if (!this.roonCore) {
       log.warn("Can't send entity data after subscribe: Roon core not available");
       return;
@@ -148,20 +152,34 @@ export default class RoonDriver implements RoonDriverInterface {
 
     entityIds.forEach((entityId) => {
       const entity = this.driver.getConfiguredEntities().getEntity(entityId);
-      if (entity) {
-        log.info(`Subscribe: ${entityId}`);
 
-        // update entity with current Zone information
-        const zone = this.roonTransport?.zone_by_zone_id(entityId);
-        if (zone) {
-          log.debug(`Zone data: ${JSON.stringify(zone)}`);
-          const attr = mediaPlayerAttributesFromZone(zone);
-          this.driver.getConfiguredEntities().updateEntityAttributes(entity.id, attr);
-        } else {
-          // Send entity change with last known information to update UI
-          this.driver.emit(uc.Events.EntityAttributesUpdated, entity.id, entity.entity_type, entity.attributes);
-        }
+      if (!entity) {
+        return;
       }
+
+      log.info(`Subscribe: ${entityId}`);
+
+      // Resolve the configured entity by its physical output rather than
+      // assuming its original zone_id still exists. This allows an entity
+      // to follow its output when Roon has moved it into a group.
+      const zone = this.resolveCurrentZone(entityId);
+
+      if (zone) {
+        log.debug(
+          `Subscribe resolved entity ${entityId} to current Roon zone ` + `${zone.display_name} (${zone.zone_id})`
+        );
+
+        this.updateMediaPlayerFromZone(zone);
+        return;
+      }
+
+      // During startup UC may subscribe before Roon has delivered its
+      // initial zone snapshot. Preserve the entity's last known attributes;
+      // the Roon "Subscribed" event will refresh them once currentZones
+      // has been populated.
+      log.debug(`Current Roon zone not yet known for subscribed entity ${entityId}; ` + `using last known attributes`);
+
+      this.driver.emit(uc.Events.EntityAttributesUpdated, entity.id, entity.entity_type, entity.attributes);
     });
   }
 
@@ -187,6 +205,34 @@ export default class RoonDriver implements RoonDriverInterface {
     this.roonApiStatus?.set_status("Connected", false);
   }
 
+  /**
+   * Reconcile configured UC entities against Roon's current zone topology.
+   *
+   * A configured entity remains available as long as at least one of its
+   * configured physical outputs exists in a current Roon zone. This
+   * distinguishes an output joining/leaving a group from an output
+   * actually disappearing from Roon.
+   */
+  private reconcileConfiguredEntityAvailability(): void {
+    this.config.forEachZone((configuredZone) => {
+      const entityId = configuredZone.zone_id;
+
+      if (!this.driver.getConfiguredEntities().contains(entityId)) {
+        return;
+      }
+
+      const currentZone = this.resolveCurrentZone(entityId);
+
+      if (currentZone) {
+        return;
+      }
+
+      log.debug(`Configured entity ${entityId} is not present in any current Roon zone; ` + `marking unavailable`);
+
+      this.setEntityState(entityId, uc.MediaPlayerStates.Unavailable);
+    });
+  }
+
   private async subscribeRoonZones() {
     if (this.roonCore == null) {
       log.warn("Cannot subscribe to Roon zones. Roon Core not available.");
@@ -201,9 +247,24 @@ export default class RoonDriver implements RoonDriverInterface {
     // add event listeners to roon
     this.roonTransport.subscribe_zones(async (cmd, msg) => {
       // log.debug("subscribe_zones callback: %s - %s", cmd, JSON.stringify(msg))
+
       switch (cmd) {
         case "Changed": {
           const data = msg as SubscribeZoneChanged;
+
+          // Remove old zones from the current topology first.
+          //
+          // Do NOT mark the corresponding configured entity unavailable
+          // here. Roon also reports a zone as removed when its output is
+          // moved into a group.
+          if (data.zones_removed) {
+            data.zones_removed.forEach((zoneId) => {
+              log.info(`Zone removed: ${zoneId}`);
+              this.currentZones.delete(zoneId);
+            });
+          }
+
+          // Add newly created zones, including groups.
           if (data.zones_added) {
             data.zones_added.forEach((zone: Zone) => {
               log.info(`Zone added: ${zone.display_name}`);
@@ -211,38 +272,52 @@ export default class RoonDriver implements RoonDriverInterface {
             });
           }
 
-          if (data.zones_removed) {
-            data.zones_removed.forEach((zoneId) => {
-              log.info(`Zone removed: ${zoneId}`);
-              this.setEntityState(zoneId, uc.MediaPlayerStates.Unavailable);
-            });
-          }
-
+          // Refresh existing zones.
           if (data.zones_changed) {
             data.zones_changed.forEach((zone: Zone) => {
               log.debug(`Zone changed: ${zone.display_name}`);
               this.updateMediaPlayerFromZone(zone);
             });
-          } else if (data.zones_seek_changed) {
-            data.zones_seek_changed.forEach((zone) => {
-              // ignore zone if it's not in our zone configuration
-              if (!this.config.hasZone(zone.zone_id)) {
-                return;
-              }
-              if (!this.driver.getConfiguredEntities().contains(zone.zone_id)) {
-                log.debug(`Configured entity not found, not updating seek: ${zone.zone_id}`);
+          }
+
+          // Seek updates are independent of zones_changed.
+          if (data.zones_seek_changed) {
+            data.zones_seek_changed.forEach((seekChange) => {
+              const currentZone = this.currentZones.get(seekChange.zone_id);
+
+              if (!currentZone) {
+                log.debug(`Current zone not found, not updating seek: ${seekChange.zone_id}`);
                 return;
               }
 
-              this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, {
-                [uc.MediaPlayerAttributes.MediaPosition]: zone.seek_position ?? 0
-              });
+              const entityIds = this.findConfiguredEntityIdsForZone(currentZone);
+
+              for (const entityId of entityIds) {
+                if (!this.driver.getConfiguredEntities().contains(entityId)) {
+                  continue;
+                }
+
+                this.driver.getConfiguredEntities().updateEntityAttributes(entityId, {
+                  [uc.MediaPlayerAttributes.MediaPosition]: seekChange.seek_position ?? 0
+                });
+              }
             });
           }
+
+          // Only determine availability after all topology changes in
+          // this notification have been applied.
+          this.reconcileConfiguredEntityAvailability();
+
           break;
         }
+
         case "Subscribed": {
           const data = msg as SubscribeZoneSubscribed;
+
+          // Roon's initial snapshot is authoritative. Rebuild our current
+          // topology so restart/reconnect while already grouped works.
+          this.currentZones.clear();
+
           if (data.zones) {
             data.zones.forEach((zone) => {
               if (this.updateMediaPlayerFromZone(zone)) {
@@ -250,8 +325,12 @@ export default class RoonDriver implements RoonDriverInterface {
               }
             });
           }
+
+          this.reconcileConfiguredEntityAvailability();
+
           break;
         }
+
         case "Unsubscribed": {
           log.debug("Zone unsubscribe %s", JSON.stringify(msg));
           break;
@@ -261,43 +340,146 @@ export default class RoonDriver implements RoonDriverInterface {
   }
 
   /**
-   * Update configured media-player entity from given zone.
+   * Find every configured UC entity whose physical Roon output is
+   * currently part of the given Roon zone.
    *
-   * @param {Object} zone The Roon zone
+   * A Roon zone may contain multiple configured outputs when zones are
+   * grouped, so one current Roon zone can map to multiple UC entities.
    */
+  private findConfiguredEntityIdsForZone(zone: Zone): string[] {
+    const currentOutputIds = new Set(zone.outputs?.map((output) => output.output_id) ?? []);
+
+    const matches: string[] = [];
+
+    this.config.forEachZone((configuredZone) => {
+      const configuredOutputs = configuredZone.outputs ?? [];
+
+      if (configuredOutputs.some((output) => currentOutputIds.has(output.output_id))) {
+        matches.push(configuredZone.zone_id);
+      }
+    });
+
+    return matches;
+  }
+
+  /**
+   * Resolve a configured UC entity to the Roon zone that currently
+   * contains its original output.
+   */
+  public resolveCurrentZone(entityId: string): Zone | undefined {
+    const configuredZone = this.config.getZone(entityId);
+    if (!configuredZone) {
+      return undefined;
+    }
+
+    const configuredOutputIds = new Set(configuredZone.outputs?.map((output) => output.output_id) ?? []);
+
+    for (const zone of this.currentZones.values()) {
+      if (zone.outputs?.some((output) => configuredOutputIds.has(output.output_id))) {
+        return zone;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Return the current Roon zone_id for a configured UC entity.
+   */
+  public resolveCurrentZoneId(entityId: string): string | undefined {
+    return this.resolveCurrentZone(entityId)?.zone_id;
+  }
+
   private updateMediaPlayerFromZone(zone: Zone): boolean {
     if (!zone) {
       return false;
     }
-    // ignore zone if it's not in our zone configuration
-    if (!this.config.hasZone(zone.zone_id)) {
+
+    // Keep a cache of Roon's current zone topology.
+    this.currentZones.set(zone.zone_id, zone);
+
+    // One current Roon zone may contain several outputs that each have
+    // their own configured UC entity.
+    const entityIds = this.findConfiguredEntityIdsForZone(zone);
+
+    if (entityIds.length === 0) {
       return false;
     }
 
-    if (!this.driver.getConfiguredEntities().contains(zone.zone_id)) {
-      log.info(`Configured entity not found, not updating: ${zone.display_name}`);
-      return false;
-    }
-    const attr = mediaPlayerAttributesFromZone(zone);
-    if (zone.now_playing) {
-      if (!zone.now_playing.image_key) {
-        attr[uc.MediaPlayerAttributes.MediaImageUrl] = "";
-      } else {
+    let updated = false;
+
+    for (const entityId of entityIds) {
+      if (!this.driver.getConfiguredEntities().contains(entityId)) {
+        log.debug(`Configured entity not found, not updating: ${entityId} (${zone.display_name})`);
+        continue;
+      }
+
+      if (entityId !== zone.zone_id) {
+        log.debug(
+          `Mapped current Roon zone ${zone.display_name} (${zone.zone_id}) ` + `to configured entity ${entityId}`
+        );
+      }
+
+      const attr = mediaPlayerAttributesFromZone(zone);
+
+      // mediaPlayerAttributesFromZone() provides zone/group-level
+      // attributes. Volume and mute belong to the individual physical
+      // output represented by this configured UC entity.
+      //
+      // Resolve that physical output inside the current Roon zone and
+      // override the group-level volume attributes with its own values.
+      const configuredOutput = this.config.getZone(entityId)?.outputs?.[0];
+
+      const currentOutput = configuredOutput
+        ? zone.outputs?.find((output) => output.output_id === configuredOutput.output_id)
+        : undefined;
+
+      if (currentOutput?.volume) {
+        const volume = currentOutput.volume;
+
+        const volumePercentage = calculateVolumeToPercentage(volume);
+
+        log.debug(
+          `Output volume for entity ${entityId}: ` +
+            `${currentOutput.display_name} ` +
+            `native=${volume.value}, ` +
+            `percentage=${volumePercentage}, ` +
+            `muted=${volume.is_muted}`
+        );
+
+        attr[uc.MediaPlayerAttributes.Volume] = volumePercentage;
+
+        attr[uc.MediaPlayerAttributes.Muted] = volume.is_muted ?? false;
+      }
+
+      if (zone.now_playing?.image_key) {
         const image = this.browseService?.buildImageUrl(zone.now_playing.image_key);
-        if (image) {
-          this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, {
-            [uc.MediaPlayerAttributes.MediaImageUrl]: image
-          });
-        }
+        log.debug(`Artwork for ${zone.display_name}: ${zone.now_playing.image_key} -> ${image ?? "none"}`);
+
+        attr[uc.MediaPlayerAttributes.MediaImageUrl] = image ?? "";
+      } else {
+        log.debug(`No artwork for ${zone.display_name}`);
+        // Explicitly clear stale artwork.
+        attr[uc.MediaPlayerAttributes.MediaImageUrl] = "";
+      }
+
+      const entity = this.driver.getConfiguredEntities().getEntity(entityId) as RoonMediaPlayer;
+
+      if (entity) {
+        entity.updateStandbySupport(getStandbySupport(zone));
+      }
+
+      log.debug(
+        `Updating entity ${entityId} from zone ${zone.display_name}: ` +
+          `state=${attr[uc.MediaPlayerAttributes.State]}, ` +
+          `artwork=${attr[uc.MediaPlayerAttributes.MediaImageUrl] ?? "unset"}`
+      );
+
+      if (this.driver.getConfiguredEntities().updateEntityAttributes(entityId, attr)) {
+        updated = true;
       }
     }
-
-    const entity = this.driver.getConfiguredEntities().getEntity(zone.zone_id) as RoonMediaPlayer;
-    if (entity) {
-      entity.updateStandbySupport(getStandbySupport(zone));
-    }
-
-    return this.driver.getConfiguredEntities().updateEntityAttributes(zone.zone_id, attr);
+    return updated;
   }
 
   private async handleRoonCorePaired(core: Core) {
@@ -368,8 +550,22 @@ export default class RoonDriver implements RoonDriverInterface {
     });
   }
 
+  // public getDefaultZoneOutput(zoneId: string): Output | undefined {
+  //   return this.config.getZone(zoneId)?.outputs?.[0];
+  // }
+
   public getDefaultZoneOutput(zoneId: string): Output | undefined {
-    return this.config.getZone(zoneId)?.outputs?.[0];
+    const configuredOutput = this.config.getZone(zoneId)?.outputs?.[0];
+    if (!configuredOutput) {
+      return undefined;
+    }
+
+    const currentZone = this.resolveCurrentZone(zoneId);
+    if (!currentZone) {
+      return configuredOutput;
+    }
+
+    return currentZone.outputs?.find((output) => output.output_id === configuredOutput.output_id) ?? configuredOutput;
   }
 
   public setEntityState(entityId: string, state: uc.MediaPlayerStates) {
