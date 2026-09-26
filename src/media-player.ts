@@ -70,6 +70,14 @@ export function getLoopMode(repeat: string | undefined): LoopSetting {
   }
 }
 
+/**
+ * BrowseMediaItem requires a non-empty title, but Roon returns empty titles for e.g. albums without an album tag.
+ * Without a fallback, a single such item fails the whole browse page.
+ */
+function displayTitle(title: string | undefined): string {
+  return title?.trim() || "Untitled";
+}
+
 export class RoonMediaPlayer extends uc.MediaPlayer {
   private _supportsStandby = false;
 
@@ -477,7 +485,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
 
       const header = resultHeader.list;
       let totalCount = header.count;
-      const title = header.title;
+      const title = displayTitle(header.title);
 
       const loadResult = await browseService.load({
         hierarchy,
@@ -523,6 +531,9 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
     return items
       .filter((item) => !EXCLUDE_ITEMS.includes(item.title))
       .map((item) => {
+        const title = displayTitle(item.title);
+        // A path-based media id is built from the title, so an item without a title can't be addressed by path.
+        const addressable = typeof override?.mediaPath !== "string" || !!item.title?.trim();
         const imageId = item.image_key || override?.listImageId;
         const thumbnail =
           imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
@@ -554,12 +565,12 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           mediaContentType = override.mediaType;
         }
 
-        return new uc.BrowseMediaItem(mediaContentId, item.title, {
+        return new uc.BrowseMediaItem(mediaContentId, title, {
           subtitle: item.subtitle,
           media_class: mediaClass,
           media_type: mediaContentType,
-          can_play: true,
-          can_browse: canBrowse,
+          can_play: addressable,
+          can_browse: canBrowse && addressable,
           thumbnail
         });
       });
