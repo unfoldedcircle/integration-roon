@@ -49,7 +49,10 @@ export interface RoonDriver {
   readonly roonPaired: boolean;
   readonly roonTransport: RoonApiTransport | null;
   readonly browseService: BrowseService | null;
+  // getDefaultZoneOutput(zoneId: string): Output | undefined;
+  // setEntityState(entityId: string, state: uc.MediaPlayerStates): void;
   getDefaultZoneOutput(zoneId: string): Output | undefined;
+  resolveCurrentZoneId(entityId: string): string | undefined;
   setEntityState(entityId: string, state: uc.MediaPlayerStates): void;
 }
 
@@ -218,10 +221,14 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           }
           return uc.StatusCodes.ServiceUnavailable;
         }
-        case uc.MediaPlayerCommands.Seek:
+        case uc.MediaPlayerCommands.Seek: {
+          const zoneId = this.roonDriver.resolveCurrentZoneId(this.id);
+          if (!zoneId) {
+            return uc.StatusCodes.ServiceUnavailable;
+          }
           return await new Promise((resolve) => {
             this.roonDriver.roonTransport?.seek(
-              this.id,
+              zoneId,
               "absolute",
               Number(params?.media_position),
               (error: string | false) => {
@@ -234,10 +241,15 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
               }
             );
           });
+        }
         case uc.MediaPlayerCommands.Shuffle: {
           const shuffle = !!params?.shuffle;
+          const zoneId = this.roonDriver.resolveCurrentZoneId(this.id);
+          if (!zoneId) {
+            return uc.StatusCodes.ServiceUnavailable;
+          }
           return await new Promise((resolve) => {
-            this.roonDriver.roonTransport?.change_settings(this.id, { shuffle }, (error: string | false) => {
+            this.roonDriver.roonTransport?.change_settings(zoneId, { shuffle }, (error: string | false) => {
               if (error) {
                 log.error(`Shuffle error: ${error}`);
                 resolve(mapRoonErrorToStatusCode(error));
@@ -250,8 +262,12 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
         case uc.MediaPlayerCommands.Repeat: {
           const repeat = params?.repeat?.toString();
           const loop = getLoopMode(repeat);
+          const zoneId = this.roonDriver.resolveCurrentZoneId(this.id);
+          if (!zoneId) {
+            return uc.StatusCodes.ServiceUnavailable;
+          }
           return await new Promise((resolve) => {
-            this.roonDriver.roonTransport?.change_settings(this.id, { loop }, (error: string | false) => {
+            this.roonDriver.roonTransport?.change_settings(zoneId, { loop }, (error: string | false) => {
               if (error) {
                 log.error(`Repeat error: ${error}`);
                 resolve(mapRoonErrorToStatusCode(error));
@@ -261,6 +277,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
             });
           });
         }
+
         case uc.MediaPlayerCommands.PlayMedia: {
           const itemKey = params?.media_id as string;
           const mediaType = params?.media_type as string;
@@ -269,6 +286,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
           if (!this.roonDriver.browseService) {
             return uc.StatusCodes.ServiceUnavailable;
           }
+          const zoneId = this.roonDriver.resolveCurrentZoneId(this.id) ?? this.id;
 
           if (mediaType === "library" || mediaType === "track" || mediaType === "search") {
             if (action) {
@@ -278,7 +296,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
             // Roon quirk: a media_id returned from a search requires matching hierarchy.
             const hierarchy: RoonApiBrowseHierarchy = mediaType === "search" ? "search" : "browse";
 
-            return await this.roonDriver.browseService.playItemById(this.id, itemKey, hierarchy);
+            return await this.roonDriver.browseService.playItemById(zoneId, itemKey, hierarchy);
           } else {
             // media_id is a path matching the Roon menu structure
             const pathList = splitMediaPath(itemKey);
@@ -300,7 +318,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
                 break;
             }
 
-            return await this.roonDriver.browseService.playItemByPath(this.id, pathList, playAction);
+            return await this.roonDriver.browseService.playItemByPath(zoneId, pathList, playAction);
           }
         }
         default:
@@ -706,8 +724,14 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
   }
 
   private async roonControl(control: ControlAction): Promise<uc.StatusCodes> {
+    const zoneId = this.roonDriver.resolveCurrentZoneId(this.id);
+    if (!zoneId) {
+      log.warn(`No current Roon zone found for entity ${this.id}`);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
     return new Promise((resolve) => {
-      this.roonDriver.roonTransport?.control(this.id, control, (error: string | false) => {
+      this.roonDriver.roonTransport?.control(zoneId, control, (error: string | false) => {
         if (error) {
           log.error(`Media player ${control} command error: ${error}`);
           resolve(mapRoonErrorToStatusCode(error));
