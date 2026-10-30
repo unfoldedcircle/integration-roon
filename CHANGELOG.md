@@ -9,14 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.6.2 - 2026-10-30
+
 ### Fixed
 
 - Media browsing no longer fails a whole page with an error when Roon returns an item with an empty title, e.g. an album
-  without an album tag. Such items are shown as "Untitled" ([#93](https://github.com/unfoldedcircle/integration-roon/pull/93)).
+  without an album tag. Such items are shown as "Untitled". Contributed by @brucejcooper, thanks! ([#93](https://github.com/unfoldedcircle/integration-roon/pull/93)).
 - With stable ids, untitled items are no longer browsable or playable: their path-based id is built from the title and
-  would resolve to the parent list instead of the item ([#93](https://github.com/unfoldedcircle/integration-roon/pull/93)).
+  would resolve to the parent list instead of the item. Contributed by @brucejcooper, thanks! ([#93](https://github.com/unfoldedcircle/integration-roon/pull/93)).
 
----
+### Changed
+
+- Update dependencies and GitHub Actions.
 
 ## 0.6.1 - 2026-07-01
 
