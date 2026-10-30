@@ -532,16 +532,16 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       .filter((item) => !EXCLUDE_ITEMS.includes(item.title))
       .map((item) => {
         const title = displayTitle(item.title);
+        const isPathBrowsing = typeof override?.mediaPath === "string";
         // A path-based media id is built from the title, so an item without a title can't be addressed by path.
-        const addressable = typeof override?.mediaPath !== "string" || !!item.title?.trim();
+        const addressable = !isPathBrowsing || !!item.title?.trim();
         const imageId = item.image_key || override?.listImageId;
         const thumbnail =
           imageId && this.roonDriver.browseService ? this.roonDriver.browseService.buildImageUrl(imageId) : undefined;
 
-        const mediaContentId =
-          typeof override?.mediaPath === "string"
-            ? this.createMediaPath(override.mediaPath, item.title)
-            : item.item_key || "";
+        const mediaContentId = isPathBrowsing
+          ? this.createMediaPath(override.mediaPath!, item.title)
+          : item.item_key || "";
         // use a media type to indicate this is a native media id. If the client omits the media_type, the media_id is a path
         let mediaContentType: MediaContentType = "library";
         const mediaClass = this.getMatchingMediaClass(item);
@@ -576,7 +576,7 @@ export class RoonMediaPlayer extends uc.MediaPlayer {
       });
   }
 
-  private createMediaPath(rootPath: string, title: string): string {
+  private createMediaPath(rootPath: string, title = ""): string {
     const escape = title.includes("/") ? '"' : "";
     const root = rootPath ? `${rootPath}/` : "";
     return `${root}${escape}${title}${escape}`;
