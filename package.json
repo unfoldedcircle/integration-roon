@@ -1,7 +1,7 @@
 {
   "name": "uc-integration-roon",
   "type": "module",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Roon Integration for the Unfolded Circle",
   "main": "dist/src/index.js",
   "scripts": {
@@ -28,14 +28,14 @@
     "@ava/typescript": "^7.0.0",
     "@types/debug": "^4.1.12",
     "@types/node": "^22.13.9",
-    "ava": "^6.4.1",
+    "ava": "^8.0.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.3",
     "globals": "^17.6.0",
-    "neostandard": "^0.12.2",
+    "neostandard": "^0.13.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
-    "typescript-eslint": "^8.26.0"
+    "typescript-eslint": "^8.71.2"
   }
 }
