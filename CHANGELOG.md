@@ -11,6 +11,16 @@ _Changes in the next release_
 
 ---
 
+## 0.6.3 - 2026-11-06
+
+### Fixed
+
+- Update Roon API for suspend recovery ([#100](https://github.com/unfoldedcircle/integration-roon/pull/100), [feature-and-bug-tracker#831](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/831)).
+
+### Changed
+
+- Update dependencies and GitHub Actions.
+
 ## 0.6.2 - 2026-10-30
 
 ### Fixed
